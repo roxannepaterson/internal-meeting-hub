@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meeting Hub | Anchorpoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{
+  --vulcan:#101820; --white:#fff; --chalice:#b2b2b3; --rock:#a7c5ee; --deluge:#715091;
+  --purple:#573d82; --apricot:#ff9e6d; --sunset:#eb6954; --plum:#923b7f;
+  --bg:#f5f7fb; --panel:#fff; --ink:var(--vulcan); --muted:#5d636d; --line:#dde2ea;
+  --field:#fff; --soft:#eef3fb; --accent:var(--purple); --accent-ink:#fff;
+  --top:var(--vulcan);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f141b; --panel:#171e27; --ink:#eef1f5; --muted:#a3a9b3; --line:#2a3340;
+    --field:#10161e; --soft:#1e2733; --accent:#8d6cc0; --top:#0a0e13;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f141b; --panel:#171e27; --ink:#eef1f5; --muted:#a3a9b3; --line:#2a3340;
+  --field:#10161e; --soft:#1e2733; --accent:#8d6cc0; --top:#0a0e13;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font:400 15px/1.5 "Jost",system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--rock);outline-offset:2px}
+h1,h2,h3{margin:0;font-weight:500;line-height:1.2}
+h2{font-size:17px;margin-bottom:10px}
+
+/* top bar */
+.top{background:var(--top);color:#fff;display:flex;align-items:center;gap:14px;padding:12px 20px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.mark{width:22px;height:22px;border-radius:50%;flex:none;
+  background:conic-gradient(from 200deg,#a7c5ee,#715091,#923b7f,#eb6954,#ff9e6d,#a7c5ee)}
+.brand{display:flex;align-items:center;gap:14px;background:none;border:0;color:#fff;padding:0;cursor:pointer;border-radius:6px}
+.top .name{font-weight:500;font-size:17px}
+.top .name span{font-weight:300;opacity:.7;margin-left:6px}
+.top .spacer{flex:1}
+.top a{color:#fff;opacity:.75;text-decoration:none;font-size:14px}
+.top a:hover{opacity:1}
+.sync{font-size:13px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.1);white-space:nowrap}
+.sync.local{background:rgba(255,158,109,.18);color:#ffc7a8}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--deluge)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.small{padding:4px 10px;font-size:14px}
+.btn.danger{color:var(--sunset)}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:14px}
+.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px 8px;border-radius:6px}
+.x:hover{color:var(--sunset);background:var(--soft)}
+
+/* layout */
+.app{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 50px)}
+.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-width:0}
+.side-head{padding:16px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.search{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
+.filters{display:flex;gap:4px}
+.filters button{flex:1;border:0;background:none;padding:6px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:14px}
+.filters button.on{background:var(--soft);color:var(--ink);font-weight:500}
+.list{overflow:auto;flex:1;padding:6px}
+.mtg{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:none;padding:10px;border-radius:8px;cursor:pointer}
+.mtg:hover{background:var(--soft)}
+.mtg.active{background:var(--soft);box-shadow:inset 3px 0 0 var(--accent)}
+.dt{width:44px;flex:none;text-align:center;line-height:1.1}
+.dt b{display:block;font-size:20px;font-weight:500}
+.dt small{color:var(--muted);font-size:12px}
+.mt{min-width:0;flex:1}
+.mt strong{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt span{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flag{width:8px;height:8px;border-radius:50%;flex:none}
+.flag.warn{background:var(--sunset)}
+.flag.held{background:var(--rock)}
+.empty{color:var(--muted);padding:20px 12px;font-size:14px}
+
+.main{min-width:0;padding:28px clamp(16px,4vw,48px) 60px}
+.wrap{max-width:980px}
+
+/* overview */
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card.wide{grid-column:1/-1}
+.row-link{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;background:none;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.row-link:first-of-type{border-top:0}
+.row-link:hover strong{color:var(--accent)}
+.row-link span{color:var(--muted);font-size:14px;white-space:nowrap}
+.act-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.act-row:first-of-type{border-top:0}
+.act-row input{margin-top:5px;accent-color:var(--purple)}
+.act-row .meta{color:var(--muted);font-size:13px}
+.overdue{color:var(--sunset)!important}
+.intro{color:var(--muted);max-width:60ch;margin-top:6px}
+
+/* detail */
+.back{display:inline-block;margin-bottom:12px}
+.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.head-row h1{font-size:30px}
+.sub{color:var(--muted);margin:4px 0 0}
+.pill{font-size:13px;padding:3px 10px;border-radius:20px;background:var(--soft);white-space:nowrap}
+.pill.held{background:rgba(167,197,238,.35)}
+.pill.cancelled{background:rgba(235,105,84,.15);color:var(--sunset)}
+.pill.rescheduled{background:rgba(255,158,109,.2)}
+.steps{display:flex;gap:6px;margin:22px 0 24px;border-bottom:1px solid var(--line)}
+.steps button{border:0;background:none;padding:10px 16px 12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-size:15px}
+.steps button b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--soft);font-size:12px;font-weight:500;margin-right:8px}
+.steps button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:500}
+.steps button.on b{background:var(--accent);color:#fff}
+.banner{background:rgba(167,197,238,.25);border:1px solid var(--rock);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+
+section.block{margin-bottom:28px}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 16px}
+.fields .span2{grid-column:span 2}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input.in,select.in,textarea.in{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font-size:15px}
+textarea.in{min-height:84px;resize:vertical;line-height:1.5}
+.hint{color:var(--muted);font-size:13px;margin:-4px 0 10px}
+.rows{display:flex;flex-direction:column;gap:8px}
+.r{display:grid;gap:8px;align-items:center}
+.r.att{grid-template-columns:1.2fr 1fr auto}
+.r.ag{grid-template-columns:1fr 90px 160px auto}
+.r.q{grid-template-columns:1fr auto}
+.r.ac{grid-template-columns:auto 1fr 150px 150px auto}
+.r.ac.done .in{text-decoration:line-through;color:var(--muted)}
+.r input[type=checkbox]{width:18px;height:18px;accent-color:var(--purple)}
+.adder{margin-top:10px}
+.total{font-size:14px;color:var(--muted);margin-top:8px}
+.total.warn{color:var(--sunset)}
+
+/* run mode: the memorable bit */
+.runner{background:var(--vulcan);color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:24px}
+.clock{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.clock .big{font-size:56px;font-weight:300;letter-spacing:.01em;font-variant-numeric:tabular-nums;line-height:1}
+.clock .of{opacity:.65}
+.clock.over .big{color:var(--apricot)}
+.bar{position:relative;display:flex;gap:3px;height:14px;margin:18px 0 8px}
+.seg{border-radius:4px;opacity:.35;min-width:6px}
+.seg.done{opacity:1}
+.seg.current{opacity:1;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+.playhead{position:absolute;top:-6px;bottom:-6px;width:2px;background:#fff;border-radius:2px;left:0;transition:left .5s linear}
+.seglabels{display:flex;gap:3px;font-size:12px;opacity:.6}
+.seglabels span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:6px}
+.now{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:16px;flex-wrap:wrap}
+.now small{display:block;opacity:.6;font-size:13px}
+.now strong{font-size:20px;font-weight:500}
+.left{font-variant-numeric:tabular-nums;font-size:18px}
+.left.over{color:var(--apricot)}
+.controls{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+.runner .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.runner .btn:hover{border-color:#fff}
+.runner .btn.go{background:var(--apricot);border-color:var(--apricot);color:var(--vulcan);font-weight:500}
+.run-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:24px}
+textarea.notes{min-height:320px}
+.capture{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.capture input{flex:1;min-width:180px}
+.check{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
+.check input{margin-top:5px;width:16px;height:16px;accent-color:var(--purple)}
+.check.done span{color:var(--muted);text-decoration:line-through}
+.mini{font-size:14px;padding:6px 0;border-top:1px solid var(--line)}
+.mini:first-child{border-top:0}
+.foot-actions{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:18px;margin-top:10px}
+.top .btn.ghost{background:transparent;border-color:rgba(255,255,255,.25);color:#fff}
+.top .btn.ghost:hover,.top .btn.ghost.on{border-color:#fff;background:rgba(255,255,255,.08)}
+.count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--apricot);color:var(--vulcan);font-size:12px;font-weight:500;text-align:center}
+.count:empty{display:none}
+.act-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.act-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.act-tools select{width:auto;min-width:170px}
+.group{margin-top:22px}
+.group h2{display:flex;gap:8px;align-items:baseline}
+.group h2 small{color:var(--muted);font-weight:400;font-size:14px}
+.group.late h2{color:var(--sunset)}
+.act-row .txt{font-weight:500}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--vulcan);color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:10}
+.toast.show{opacity:1;transform:translateX(-50%)}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{border-right:0}
+  body.open .side{display:none}
+  body:not(.open) .main{display:none}
+  .ov-grid,.run-grid{grid-template-columns:1fr}
+  .fields .span2{grid-column:auto}
+  .r.att,.r.ag,.r.ac{grid-template-columns:1fr 1fr}
+  .r.att .x,.r.ag .x,.r.ac .x{justify-self:end}
+  .r.ac .txt{grid-column:1/-1;order:-1}
+  .top .hub{display:none}
+  .clock .big{font-size:44px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="brand" data-act="home" aria-label="Go to overview"><span class="mark" aria-hidden="true"></span><span class="name">Meeting Hub<span>Anchorpoint</span></span></button>
+  <div class="spacer"></div>
+  <a class="hub" href="https://roxannepaterson.github.io/bd-tools-hub/">Tools hub</a>
+  <span class="sync" id="sync">Connecting</span>
+  <button class="btn ghost" data-act="home" id="nav-home">Overview</button>
+  <button class="btn ghost" data-act="actions-view" id="nav-actions">Actions<span class="count" id="act-count"></span></button>
+  <button class="btn primary" data-act="new">New meeting</button>
+</header>
+
+<div class="app">
+  <aside class="side">
+    <div class="side-head">
+      <input class="search" id="search" type="search" placeholder="Search title, team or attendee" aria-label="Search meetings">
+      <div class="filters" role="tablist">
+        <button data-act="filter" data-filter="upcoming" class="on">Upcoming</button>
+        <button data-act="filter" data-filter="past">Past</button>
+        <button data-act="filter" data-filter="all">All</button>
+      </div>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main class="main"><div class="wrap" id="main"></div></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ---------- Firebase setup ----------
+   Paste apiKey, databaseURL, messagingSenderId and appId from the config
+   block in any of your other hub tools (same project: bd-tools-73705).
+   Until then, the hub saves to this browser only. */
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "bd-tools-73705.firebaseapp.com",
+  databaseURL: "PASTE_DATABASE_URL",
+  projectId: "bd-tools-73705",
+  storageBucket: "bd-tools-73705.appspot.com",
+  messagingSenderId: "PASTE_SENDER_ID",
+  appId: "PASTE_APP_ID"
+};
+const DB_PATH = "meetingHub/meetings";
+const LS_KEY = "anchorpoint-meeting-hub";
+const CLIENT = Math.random().toString(36).slice(2, 10);
+const TYPES = ["Team meeting", "1:1", "Project", "Planning", "Review", "Workshop", "Follow-up", "Other"];
+const STATUSES = { planned: "Planned", held: "Held", rescheduled: "Rescheduled", cancelled: "Cancelled" };
+const SEG_COLOURS = ["#715091", "#a7c5ee", "#ff9e6d", "#923b7f", "#573d82", "#eb6954"];
+
+let meetings = {}, currentId = null, step = "prep", filter = "upcoming", query = "";
+let pending = {}, loaded = false, view = "meetings", ownerFilter = "";
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pad = n => String(n).padStart(2, "0");
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function addDays(iso, n) { const d = new Date(iso + "T00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function fmtDate(iso, opts) { if (!iso) return "No date"; return new Date(iso + "T00:00").toLocaleDateString("en-GB", opts || { weekday: "short", day: "numeric", month: "short", year: "numeric" }); }
+const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.values(v) : []);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2200); }
+function setSync(text, local) { const s = $("sync"); s.textContent = text; s.classList.toggle("local", !!local); }
+
+function blank(extra) {
+  return Object.assign({
+    id: uid(), team: "", title: "", date: todayISO(), time: "10:00", duration: 60,
+    location: "", type: "Team meeting", status: "planned",
+    attendees: [], objective: "", background: "", questions: [], agenda: [],
+    notes: "", outcome: "", decisions: "", actions: [], nextDate: "",
+    createdAt: Date.now(), updatedAt: Date.now(), updatedBy: CLIENT
+  }, extra || {});
+}
+function normalize(m) {
+  const o = Object.assign(blank(), m);
+  ["attendees", "questions", "agenda", "actions"].forEach(k => o[k] = toArr(o[k]));
+  return o;
+}
+const current = () => currentId ? meetings[currentId] : null;
+const all = () => Object.values(meetings);
+const openActions = m => m.actions.filter(a => !a.done && (a.text || "").trim());
+function needsFollowUp(m) {
+  if (m.date >= todayISO()) return false;
+  if (m.status === "planned") return true;
+  return m.status === "held" && !m.actions.some(a => (a.text || "").trim());
+}
+
+/* ---------- storage ---------- */
+const store = {
+  db: null,
+  init() {
+    const ready = window.firebase && !FIREBASE_CONFIG.apiKey.startsWith("PASTE") && !FIREBASE_CONFIG.databaseURL.startsWith("PASTE");
+    if (ready) {
+      try {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        this.db = firebase.database();
+        this.db.ref(DB_PATH).on("value", s => onData(s.val() || {}), err => {
+          console.error(err); setSync("Can't reach Firebase", true); this.db = null; this.loadLocal();
+        });
+        this.db.ref(".info/connected").on("value", s => setSync(s.val() ? "Live, shared with team" : "Offline, will sync", !s.val()));
+        return;
+      } catch (e) { console.error(e); this.db = null; }
+    }
+    setSync("This browser only", true);
+    this.loadLocal();
+  },
+  loadLocal() { let d = {}; try { d = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) {} onData(d); },
+  save(m) {
+    m.updatedAt = Date.now(); m.updatedBy = CLIENT;
+    const clean = JSON.parse(JSON.stringify(m));
+    if (this.db) {
+      setSync("Saving…");
+      this.db.ref(`${DB_PATH}/${m.id}`).set(clean).then(() => setSync("Live, shared with team")).catch(e => { console.error(e); setSync("Save failed, check connection", true); });
+    } else {
+      try { localStorage.setItem(LS_KEY, JSON.stringify(meetings)); } catch (e) { setSync("Couldn't save in this browser", true); }
+    }
+  },
+  remove(id) {
+    if (this.db) this.db.ref(`${DB_PATH}/${id}`).remove();
+    else { try { localStorage.setItem(LS_KEY, JSON.stringify(meetings)); } catch (e) {} }
+  }
+};
+
+function scheduleSave(m) {
+  m = m || current(); if (!m) return;
+  clearTimeout(pending[m.id]);
+  pending[m.id] = setTimeout(() => { delete pending[m.id]; if (meetings[m.id]) store.save(meetings[m.id]); }, 500);
+}
+function flushAll() { Object.keys(pending).forEach(id => { clearTimeout(pending[id]); delete pending[id]; if (meetings[id]) store.save(meetings[id]); }); }
+window.addEventListener("beforeunload", flushAll);
+
+function onData(raw) {
+  const incoming = {};
+  Object.entries(raw).forEach(([id, m]) => { if (m) incoming[id] = normalize(Object.assign({ id }, m)); });
+  const prev = current();
+  const remoteChange = prev && incoming[currentId] && incoming[currentId].updatedBy !== CLIENT && incoming[currentId].updatedAt > prev.updatedAt;
+  // keep our own in-flight edits for the open meeting
+  if (prev && incoming[currentId] && (pending[currentId] || incoming[currentId].updatedBy === CLIENT)) incoming[currentId] = prev;
+  meetings = incoming;
+  renderList();
+  if (!loaded) { loaded = true; renderMain(); return; }
+  if (currentId && !meetings[currentId]) { currentId = null; renderMain(); return; }
+  if (!currentId) { renderMain(); return; }
+  if (remoteChange) {
+    const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest(".main") && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (typing) showBanner(); else renderMain();
+  }
+}
+
+/* ---------- sidebar ---------- */
+function matches(m) {
+  if (!query) return true;
+  const hay = [m.title, m.team, m.type, ...m.attendees.map(a => a.name + " " + a.role)].join(" ").toLowerCase();
+  return hay.includes(query.toLowerCase());
+}
+function renderList() {
+  const t = todayISO();
+  const n = all().reduce((c, m) => c + openActions(m).length, 0);
+  $("act-count").textContent = n || "";
+  $("nav-actions").classList.toggle("on", view === "actions" && !currentId);
+  let items = all().filter(matches);
+  if (filter === "upcoming") items = items.filter(m => m.date >= t).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  else if (filter === "past") items = items.filter(m => m.date < t).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  else items.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  if (!items.length) {
+    $("list").innerHTML = `<p class="empty">${query ? "No meetings match that search." : filter === "upcoming" ? "Nothing booked. Add one with New meeting." : "No meetings here yet."}</p>`;
+    return;
+  }
+  $("list").innerHTML = items.map(m => {
+    const d = m.date ? new Date(m.date + "T00:00") : null;
+    const flag = needsFollowUp(m) ? `<span class="flag warn" title="Needs follow-up"></span>` : m.status === "held" ? `<span class="flag held" title="Held"></span>` : "";
+    return `<button class="mtg ${m.id === currentId ? "active" : ""}" data-act="open" data-id="${m.id}">
+      <span class="dt"><b>${d ? d.getDate() : "?"}</b><small>${d ? d.toLocaleDateString("en-GB", { month: "short" }) : ""}</small></span>
+      <span class="mt"><strong>${esc(m.title) || "Untitled meeting"}</strong><span>${esc(m.team || m.type)}${m.time ? ", " + esc(m.time) : ""}${m.status === "cancelled" ? " (cancelled)" : ""}</span></span>
+      ${flag}</button>`;
+  }).join("");
+}
+
+/* ---------- main ---------- */
+function renderMain() {
+  document.body.classList.toggle("open", !!currentId || view === "actions");
+  const m = current();
+  $("main").innerHTML = m ? renderDetail(m) : view === "actions" ? renderActions() : renderOverview();
+  $("nav-actions").classList.toggle("on", view === "actions" && !m);
+  $("nav-home").classList.toggle("on", view !== "actions" && !m);
+  if (m && step === "run") { ensureTimer(m); updateTimerUI(); }
+}
+
+function renderOverview() {
+  const t = todayISO(), in7 = addDays(t, 7);
+  const week = all().filter(m => m.date >= t && m.date <= in7 && m.status !== "cancelled").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const acts = [];
+  all().forEach(m => m.actions.forEach((a, i) => { if (!a.done && (a.text || "").trim()) acts.push({ m, a, i }); }));
+  acts.sort((x, y) => (x.a.due || "9999").localeCompare(y.a.due || "9999"));
+  const needs = all().filter(needsFollowUp).sort((a, b) => b.date.localeCompare(a.date));
+
+  const weekHtml = week.length ? week.map(m => `<button class="row-link" data-act="open" data-id="${m.id}"><strong>${esc(m.title) || "Untitled meeting"}${m.team ? `, ${esc(m.team)}` : ""}</strong><span>${fmtDate(m.date, { weekday: "short", day: "numeric", month: "short" })} ${esc(m.time)}</span></button>`).join("")
+    : `<p class="empty">No meetings in the next seven days.</p>`;
+  const actHtml = acts.length ? acts.map(({ m, a, i }) => {
+    const late = a.due && a.due < t;
+    return `<div class="act-row"><input type="checkbox" aria-label="Mark done" data-mid="${m.id}" data-list="actions" data-i="${i}" data-k="done">
+      <div><div>${esc(a.text)}</div><div class="meta"><button class="link" data-act="open" data-id="${m.id}" data-step="follow">${esc(m.title) || "Untitled meeting"}</button>${a.owner ? `, ${esc(a.owner)}` : ""}${a.due ? `, <span class="${late ? "overdue" : ""}">due ${fmtDate(a.due, { day: "numeric", month: "short" })}</span>` : ""}</div></div></div>`;
+  }).join("") : `<p class="empty">No open actions. Actions captured in meetings appear here.</p>`;
+  const needsHtml = needs.length ? needs.map(m => `<button class="row-link" data-act="open" data-id="${m.id}" data-step="follow"><strong>${esc(m.title) || "Untitled meeting"}${m.team ? `, ${esc(m.team)}` : ""}</strong><span>${m.status === "planned" ? "Outcome not logged" : "No actions logged"}</span></button>`).join("")
+    : `<p class="empty">Every past meeting has an outcome and actions.</p>`;
+
+  return `<h1 style="font-size:30px">Meetings</h1>
+    <p class="intro">Prep each internal meeting, run it with a timed agenda and live notes, then log decisions and actions so nothing gets lost afterwards.</p>
+    <div class="ov-grid">
+      <div class="card"><h2>Next seven days</h2>${weekHtml}</div>
+      <div class="card"><h2>Needs follow-up</h2>${needsHtml}</div>
+      <div class="card wide"><div class="act-head"><h2>Open actions (${acts.length})</h2>${acts.length ? `<button class="link" data-act="actions-view">See all actions</button>` : ""}</div>${actHtml}</div>
+    </div>`;
+}
+
+function subline(m) {
+  return [m.team, fmtDate(m.date), m.time, m.duration ? m.duration + " min" : "", m.type, m.location].filter(Boolean).map(esc).join(", ");
+}
+function renderDetail(m) {
+  const tabs = [["prep", "Prep"], ["run", "Run"], ["follow", "Follow up"]];
+  return `<button class="link back" data-act="back">Back to overview</button>
+    <div class="head-row">
+      <div><h1 id="h-title">${esc(m.title) || "New meeting"}</h1><p class="sub" id="h-sub">${subline(m)}</p></div>
+      <span class="pill ${m.status}" id="h-status">${STATUSES[m.status] || "Planned"}</span>
+    </div>
+    <nav class="steps">${tabs.map(([k, l], i) => `<button data-act="step" data-step="${k}" class="${step === k ? "on" : ""}"><b>${i + 1}</b>${l}</button>`).join("")}</nav>
+    <div id="banner"></div>
+    ${step === "prep" ? renderPrep(m) : step === "run" ? renderRun(m) : renderFollow(m)}`;
+}
+function updateHeader() {
+  const m = current(); if (!m) return;
+  if ($("h-title")) $("h-title").textContent = m.title || "New meeting";
+  if ($("h-sub")) $("h-sub").innerHTML = subline(m);
+  if ($("h-status")) { $("h-status").textContent = STATUSES[m.status]; $("h-status").className = "pill " + m.status; }
+}
+function showBanner() {
+  const b = $("banner"); if (!b) return;
+  b.innerHTML = `<div class="banner"><span>A colleague has updated this meeting.</span><button class="btn small" data-act="reload">Show latest</button></div>`;
+}
+
+const input = (f, v, type = "text", ph = "") => `<input class="in" type="${type}" data-f="${f}" value="${esc(v)}" placeholder="${esc(ph)}">`;
+const area = (f, v, ph = "", cls = "") => `<textarea class="in ${cls}" data-f="${f}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
+const li = (list, i, k, v, type = "text", ph = "", extra = "") => `<input class="in ${extra}" type="${type}" data-list="${list}" data-i="${i}" data-k="${k}" value="${esc(v)}" placeholder="${esc(ph)}" aria-label="${esc(ph || k)}">`;
+const rm = (list, i) => `<button class="x" data-act="remove" data-list="${list}" data-i="${i}" aria-label="Remove">&times;</button>`;
+const agendaMins = m => m.agenda.reduce((s, a) => s + (Number(a.mins) || 0), 0);
+
+function renderPrep(m) {
+  const total = agendaMins(m), over = m.duration && total > m.duration;
+  return `
+  <section class="block"><h2>Details</h2>
+    <div class="fields">
+      <label class="f">Meeting title${input("title", m.title, "text", "e.g. Monday team catch-up")}</label>
+      <label class="f">Team or project${input("team", m.team, "text", "e.g. Marketing")}</label>
+      <label class="f">Type<select class="in" data-f="type">${TYPES.map(t => `<option ${t === m.type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label class="f">Date${input("date", m.date, "date")}</label>
+      <label class="f">Start time${input("time", m.time, "time")}</label>
+      <label class="f">Length (minutes)${input("duration", m.duration, "number")}</label>
+      <label class="f span2">Where${input("location", m.location, "text", "Room, office or Teams link")}</label>
+    </div>
+  </section>
+  <section class="block"><h2>Attendees</h2>
+    <div class="rows">${m.attendees.map((a, i) => `<div class="r att">${li("attendees", i, "name", a.name, "text", "Name")}${li("attendees", i, "role", a.role, "text", "Role")}
+      ${rm("attendees", i)}</div>`).join("")}</div>
+    <button class="btn small adder" data-act="add" data-list="attendees">Add attendee</button>
+  </section>
+  <section class="block"><h2>Objective</h2>
+    <p class="hint">What does a good outcome look like when you walk out?</p>
+    ${area("objective", m.objective, "e.g. Agree priorities for next quarter and who owns each one")}
+  </section>
+  <section class="block"><h2>Context</h2>
+    ${area("background", m.background, "Background, previous decisions, anything people should read beforehand")}
+  </section>
+  <section class="block"><h2>Questions to raise</h2>
+    <div class="rows">${m.questions.map((q, i) => `<div class="r q">${li("questions", i, "text", q.text, "text", "Question")}${rm("questions", i)}</div>`).join("")}</div>
+    <button class="btn small adder" data-act="add" data-list="questions">Add question</button>
+  </section>
+  <section class="block"><h2>Agenda</h2>
+    <div class="rows">${m.agenda.map((a, i) => `<div class="r ag">${li("agenda", i, "topic", a.topic, "text", "Topic")}${li("agenda", i, "mins", a.mins, "number", "Min")}${li("agenda", i, "owner", a.owner, "text", "Led by")}${rm("agenda", i)}</div>`).join("")}</div>
+    <button class="btn small adder" data-act="add" data-list="agenda">Add agenda item</button>
+    <p class="total ${over ? "warn" : ""}" id="ag-total">${m.agenda.length ? `Agenda totals ${total} of ${m.duration || 0} minutes${over ? ". Trim something or extend the meeting." : "."}` : "Add agenda items to use the timer in Run."}</p>
+  </section>
+  <div class="foot-actions"><span></span><button class="btn primary" data-act="step" data-step="run">Start the meeting</button></div>`;
+}
+
+function renderRun(m) {
+  const total = agendaMins(m) || 1;
+  const segs = m.agenda.map((a, i) => `<span class="seg" data-seg="${i}" style="flex:${Math.max(Number(a.mins) || 1, 1)};background:${SEG_COLOURS[i % SEG_COLOURS.length]}"></span>`).join("");
+  const labels = m.agenda.map(a => `<span style="flex:${Math.max(Number(a.mins) || 1, 1)}">${esc(a.topic)}</span>`).join("");
+  return `
+  <section class="runner">
+    <div class="clock" id="t-clock"><span class="big" id="t-elapsed">00:00</span><span class="of">of ${agendaMins(m) || m.duration || 0} min planned</span></div>
+    ${m.agenda.length ? `<div class="bar">${segs}<i class="playhead" id="t-head"></i></div><div class="seglabels">${labels}</div>` : ""}
+    <div class="now"><div><small>Now</small><strong id="t-item"></strong></div><div class="left" id="t-left"></div></div>
+    <div class="controls">
+      <button class="btn go" data-act="t-toggle" id="t-toggle">Start</button>
+      <button class="btn" data-act="t-next" ${m.agenda.length ? "" : "disabled"}>Next item</button>
+      <button class="btn" data-act="t-reset">Reset</button>
+    </div>
+  </section>
+  <div class="run-grid">
+    <section>
+      <h2>Notes</h2>
+      ${area("notes", m.notes, "Type as you go. Saves automatically.", "notes")}
+      <div class="capture">
+        <input class="in" id="cap" placeholder="Capture an action or decision, Enter adds an action">
+        <button class="btn small" data-act="cap-action">Add action</button>
+        <button class="btn small" data-act="cap-decision">Add decision</button>
+      </div>
+    </section>
+    <aside>
+      <section class="block"><h2>Questions to cover</h2>
+        ${m.questions.length ? m.questions.map((q, i) => `<label class="check ${q.asked ? "done" : ""}"><input type="checkbox" ${q.asked ? "checked" : ""} data-list="questions" data-i="${i}" data-k="asked"><span>${esc(q.text) || "Untitled question"}</span></label>`).join("") : `<p class="empty" style="padding:0">No questions prepped.</p>`}
+      </section>
+      <section class="block"><h2>Captured so far</h2>
+        ${m.actions.filter(a => (a.text || "").trim()).map(a => `<div class="mini">Action: ${esc(a.text)}</div>`).join("")}
+        ${(m.decisions || "").split("\n").filter(l => l.trim()).map(l => `<div class="mini">Decision: ${esc(l.replace(/^-\s*/, ""))}</div>`).join("") || (m.actions.some(a => (a.text || "").trim()) ? "" : `<p class="empty" style="padding:0">Nothing captured yet.</p>`)}
+      </section>
+    </aside>
+  </div>
+  <div class="foot-actions"><button class="btn" data-act="step" data-step="prep">Back to prep</button><button class="btn primary" data-act="end">End meeting and follow up</button></div>`;
+}
+
+function renderFollow(m) {
+  const t = todayISO();
+  return `
+  <section class="block"><h2>Outcome</h2>
+    <div class="fields" style="margin-bottom:12px">
+      <label class="f">Status<select class="in" data-f="status">${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}" ${k === m.status ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    </div>
+    ${area("outcome", m.outcome, "What happened, in a sentence or two")}
+  </section>
+  <section class="block"><h2>Decisions</h2>
+    ${area("decisions", m.decisions, "One per line")}
+  </section>
+  <section class="block"><h2>Actions</h2>
+    <div class="rows">${m.actions.map((a, i) => `<div class="r ac ${a.done ? "done" : ""}">
+      <input type="checkbox" ${a.done ? "checked" : ""} data-list="actions" data-i="${i}" data-k="done" aria-label="Done">
+      ${li("actions", i, "text", a.text, "text", "Action", "txt")}${li("actions", i, "owner", a.owner, "text", "Owner")}
+      <input class="in ${a.due && a.due < t && !a.done ? "overdue" : ""}" type="date" data-list="actions" data-i="${i}" data-k="due" value="${esc(a.due)}" aria-label="Due date">${rm("actions", i)}</div>`).join("")}</div>
+    <button class="btn small adder" data-act="add" data-list="actions">Add action</button>
+  </section>
+  <section class="block"><h2>Next meeting</h2>
+    <div class="fields"><label class="f">Date${input("nextDate", m.nextDate, "date")}</label></div>
+    <button class="btn small adder" data-act="follow-on">Create follow-up meeting</button>
+  </section>
+  <div class="foot-actions">
+    <button class="btn danger" data-act="delete">Delete meeting</button>
+    <button class="btn primary" data-act="recap">Copy recap</button>
+  </div>`;
+}
+
+
+/* ---------- outstanding actions page ---------- */
+function outstanding() {
+  const acts = [];
+  all().forEach(m => m.actions.forEach((a, i) => { if (!a.done && (a.text || "").trim()) acts.push({ m, a, i }); }));
+  return acts;
+}
+function actionGroups(acts) {
+  const t = todayISO(), wk = addDays(t, 7);
+  const byDue = (x, y) => (x.a.due || "").localeCompare(y.a.due || "") || (x.m.date || "").localeCompare(y.m.date || "");
+  return [
+    ["late", "Overdue", acts.filter(x => x.a.due && x.a.due < t).sort(byDue)],
+    ["week", "Due in the next 7 days", acts.filter(x => x.a.due && x.a.due >= t && x.a.due <= wk).sort(byDue)],
+    ["later", "Due later", acts.filter(x => x.a.due && x.a.due > wk).sort(byDue)],
+    ["none", "No due date", acts.filter(x => !x.a.due).sort(byDue)]
+  ].filter(g => g[2].length);
+}
+function filteredOutstanding() {
+  const acts = outstanding();
+  if (!ownerFilter) return acts;
+  if (ownerFilter === "__none") return acts.filter(x => !(x.a.owner || "").trim());
+  return acts.filter(x => (x.a.owner || "").trim().toLowerCase() === ownerFilter.toLowerCase());
+}
+function renderActions() {
+  const everything = outstanding();
+  const owners = [...new Set(everything.map(x => (x.a.owner || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (ownerFilter && ownerFilter !== "__none" && !owners.some(o => o.toLowerCase() === ownerFilter.toLowerCase())) ownerFilter = "";
+  const acts = filteredOutstanding();
+  const head = `<button class="link back" data-act="back">Back to overview</button>
+    <div class="act-head">
+      <div><h1 style="font-size:30px">Outstanding actions</h1>
+      <p class="intro">${everything.length ? `${acts.length} open${ownerFilter ? " for this filter" : " across all meetings"}. Tick one off and it drops off this list.` : ""}</p></div>
+      ${everything.length ? `<div class="act-tools">
+        <select class="in" id="owner-filter" aria-label="Filter by owner">
+          <option value="">Everyone</option>
+          ${owners.map(o => `<option ${o.toLowerCase() === ownerFilter.toLowerCase() ? "selected" : ""}>${esc(o)}</option>`).join("")}
+          <option value="__none" ${ownerFilter === "__none" ? "selected" : ""}>No owner</option>
+        </select>
+        <button class="btn" data-act="copy-actions" ${acts.length ? "" : "disabled"}>Copy list</button>
+      </div>` : ""}
+    </div>`;
+  if (!everything.length) return head + `<div class="card" style="margin-top:22px"><p class="empty" style="padding:0">No outstanding actions. Actions added in a meeting's Run or Follow up step appear here until they're ticked off.</p></div>`;
+  if (!acts.length) return head + `<div class="card" style="margin-top:22px"><p class="empty" style="padding:0">Nothing outstanding for this owner. Choose Everyone to see the full list.</p></div>`;
+  const t = todayISO();
+  return head + actionGroups(acts).map(([cls, label, list]) => `
+    <div class="group ${cls}"><div class="card"><h2>${label} <small>${list.length}</small></h2>
+      ${list.map(({ m, a, i }) => `<div class="act-row">
+        <input type="checkbox" aria-label="Mark done" data-mid="${m.id}" data-list="actions" data-i="${i}" data-k="done">
+        <div><div class="txt">${esc(a.text)}</div>
+        <div class="meta">${a.owner ? esc(a.owner) : "No owner"}${a.due ? `, <span class="${a.due < t ? "overdue" : ""}">due ${fmtDate(a.due, { weekday: "short", day: "numeric", month: "short" })}</span>` : ""}.
+        From <button class="link" data-act="open" data-id="${m.id}" data-step="follow">${esc(m.title) || "Untitled meeting"}</button>, ${fmtDate(m.date, { day: "numeric", month: "short" })}</div></div>
+      </div>`).join("")}
+    </div></div>`).join("");
+}
+function actionsText() {
+  const lines = ["Outstanding actions", ""];
+  actionGroups(filteredOutstanding()).forEach(([, label, list]) => {
+    lines.push(label);
+    list.forEach(({ m, a }) => lines.push(`- ${a.text}${a.owner ? ` (${a.owner}` : " ("}${a.due ? `${a.owner ? ", " : ""}due ${fmtDate(a.due, { day: "numeric", month: "short" })}` : a.owner ? "" : "no owner"}) [${m.title || "Untitled meeting"}]`));
+    lines.push("");
+  });
+  return lines.join("\n").trim();
+}
+
+/* ---------- timer ---------- */
+let timer = { mid: null, running: false, base: 0, since: 0, idx: 0, itemStart: 0 }, tickId = null;
+const elapsedSec = () => (timer.base + (timer.running ? Date.now() - timer.since : 0)) / 1000;
+const mmss = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600); return (h ? h + ":" + pad(Math.floor(s / 60) % 60) : pad(Math.floor(s / 60))) + ":" + pad(s % 60); };
+function ensureTimer(m) {
+  if (timer.mid === m.id) return;
+  clearInterval(tickId); tickId = null;
+  const first = m.agenda.findIndex(a => !a.done);
+  timer = { mid: m.id, running: false, base: 0, since: 0, idx: first < 0 ? m.agenda.length : first, itemStart: 0 };
+}
+function updateTimerUI() {
+  const m = current(); if (!m || step !== "run" || !$("t-elapsed")) return;
+  const e = elapsedSec(), planned = agendaMins(m) || m.duration || 0;
+  $("t-elapsed").textContent = mmss(e);
+  $("t-clock").classList.toggle("over", planned > 0 && e > planned * 60);
+  if ($("t-head")) $("t-head").style.left = `calc(${Math.min(e / ((agendaMins(m) || 1) * 60), 1) * 100}% - 1px)`;
+  document.querySelectorAll("[data-seg]").forEach(s => {
+    const i = +s.dataset.seg; s.classList.toggle("done", !!(m.agenda[i] && m.agenda[i].done)); s.classList.toggle("current", i === timer.idx);
+  });
+  const item = m.agenda[timer.idx];
+  const left = $("t-left");
+  if (!m.agenda.length) { $("t-item").textContent = "No agenda set"; left.textContent = ""; }
+  else if (!item) { $("t-item").textContent = "Agenda complete"; left.textContent = ""; }
+  else {
+    $("t-item").textContent = item.topic || `Item ${timer.idx + 1}`;
+    const rem = (Number(item.mins) || 0) * 60 - (e - timer.itemStart);
+    left.textContent = rem >= 0 ? `${mmss(rem)} left` : `${mmss(-rem)} over`;
+    left.classList.toggle("over", rem < 0);
+  }
+  $("t-toggle").textContent = timer.running ? "Pause" : e > 0 ? "Resume" : "Start";
+}
+
+/* ---------- events ---------- */
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.id === "search") { query = el.value; renderList(); return; }
+  if (el.id === "owner-filter") { ownerFilter = el.value; renderMain(); return; }
+  const m = el.dataset.mid ? meetings[el.dataset.mid] : current();
+  if (!m) return;
+  const val = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? "" : Number(el.value)) : el.value;
+  if (el.dataset.f) {
+    m[el.dataset.f] = val;
+    if (["title", "team", "date", "time", "duration", "type", "location", "status"].includes(el.dataset.f)) { renderList(); updateHeader(); }
+    if (el.dataset.f === "duration") updateAgendaTotal();
+  } else if (el.dataset.list) {
+    const item = m[el.dataset.list][+el.dataset.i]; if (!item) return;
+    item[el.dataset.k] = val;
+    if (el.dataset.list === "agenda") updateAgendaTotal();
+    if (el.type === "checkbox") {
+      if (el.dataset.mid) { scheduleSave(m); setTimeout(() => { renderList(); renderMain(); }, 250); return; }
+      const row = el.closest(".r, .check"); if (row) row.classList.toggle("done", el.checked);
+      if (el.dataset.list === "actions") renderList();
+    }
+  } else return;
+  scheduleSave(m);
+});
+
+function updateAgendaTotal() {
+  const m = current(), el = $("ag-total"); if (!m || !el) return;
+  const total = agendaMins(m), over = m.duration && total > m.duration;
+  el.className = "total" + (over ? " warn" : "");
+  el.textContent = m.agenda.length ? `Agenda totals ${total} of ${m.duration || 0} minutes${over ? ". Trim something or extend the meeting." : "."}` : "Add agenda items to use the timer in Run.";
+}
+
+function openMeeting(id, s) { flushAll(); view = "meetings"; currentId = id; step = s || "prep"; renderList(); renderMain(); window.scrollTo(0, 0); }
+function createMeeting(extra) { const m = blank(extra); meetings[m.id] = m; store.save(m); openMeeting(m.id, "prep"); setTimeout(() => { const f = document.querySelector('[data-f="title"]'); if (f && !m.title) f.focus(); }, 0); }
+
+function capture(kind) {
+  const m = current(), el = $("cap"); if (!m || !el || !el.value.trim()) return;
+  const text = el.value.trim();
+  if (kind === "action") m.actions.push({ text, owner: "", due: "", done: false });
+  else m.decisions = (m.decisions ? m.decisions.replace(/\s+$/, "") + "\n" : "") + "- " + text;
+  scheduleSave(m);
+  const notes = document.querySelector('[data-f="notes"]'); const pos = notes ? notes.scrollTop : 0;
+  renderMain();
+  const n2 = document.querySelector('[data-f="notes"]'); if (n2) n2.scrollTop = pos;
+  $("cap").focus();
+  toast(kind === "action" ? "Action added" : "Decision added");
+}
+
+function recapText(m) {
+  const lines = [`Meeting recap: ${m.title || "Untitled meeting"}${m.team ? " (" + m.team + ")" : ""}`, fmtDate(m.date), ""];
+  const people = m.attendees.filter(a => a.name).map(a => a.name + (a.role ? ` (${a.role})` : ""));
+  if (people.length) lines.push("Attendees: " + people.join(", "), "");
+  if (m.outcome.trim()) lines.push("Summary", m.outcome.trim(), "");
+  const dec = m.decisions.split("\n").map(l => l.replace(/^-\s*/, "").trim()).filter(Boolean);
+  if (dec.length) lines.push("Decisions", ...dec.map(d => "- " + d), "");
+  const acts = m.actions.filter(a => (a.text || "").trim());
+  if (acts.length) lines.push("Actions", ...acts.map(a => `- ${a.text}${a.owner ? ` (${a.owner}` : ""}${a.due ? `${a.owner ? ", " : " ("}by ${fmtDate(a.due, { day: "numeric", month: "short" })}` : ""}${a.owner || a.due ? ")" : ""}${a.done ? " [done]" : ""}`), "");
+  if (m.nextDate) lines.push(`Next meeting: ${fmtDate(m.nextDate)}`);
+  return lines.join("\n").trim();
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+}
+
+document.addEventListener("keydown", e => { if (e.target.id === "cap" && e.key === "Enter") { e.preventDefault(); capture("action"); } });
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act, m = current();
+  switch (act) {
+    case "new": createMeeting(); break;
+    case "open": openMeeting(b.dataset.id, b.dataset.step); break;
+    case "home":
+    case "back": flushAll(); currentId = null; view = "meetings"; renderList(); renderMain(); break;
+    case "actions-view": flushAll(); currentId = null; view = "actions"; renderList(); renderMain(); window.scrollTo(0, 0); break;
+    case "copy-actions": copy(actionsText()).then(() => toast("Action list copied")); break;
+    case "reload": renderMain(); break;
+    case "filter":
+      filter = b.dataset.filter;
+      document.querySelectorAll(".filters button").forEach(x => x.classList.toggle("on", x === b));
+      renderList(); break;
+    case "step": step = b.dataset.step; renderMain(); window.scrollTo(0, 0); break;
+    case "add": {
+      const defs = { attendees: { name: "", role: "" }, questions: { text: "", asked: false }, agenda: { topic: "", mins: 10, owner: "", done: false }, actions: { text: "", owner: "", due: "", done: false } };
+      m[b.dataset.list].push({ ...defs[b.dataset.list] }); scheduleSave(m); renderMain();
+      const rows = document.querySelectorAll(`[data-list="${b.dataset.list}"][data-i="${m[b.dataset.list].length - 1}"]`);
+      const first = [...rows].find(r => r.type !== "checkbox"); if (first) first.focus();
+      break;
+    }
+    case "remove": m[b.dataset.list].splice(+b.dataset.i, 1); scheduleSave(m); renderMain(); break;
+    case "t-toggle":
+      if (timer.running) { timer.base += Date.now() - timer.since; timer.running = false; clearInterval(tickId); tickId = null; }
+      else { timer.since = Date.now(); timer.running = true; tickId = setInterval(updateTimerUI, 500); }
+      updateTimerUI(); break;
+    case "t-next": {
+      const item = m.agenda[timer.idx];
+      if (item) { item.done = true; scheduleSave(m); }
+      timer.idx = Math.min(timer.idx + 1, m.agenda.length); timer.itemStart = elapsedSec();
+      updateTimerUI(); break;
+    }
+    case "t-reset":
+      clearInterval(tickId); tickId = null;
+      m.agenda.forEach(a => a.done = false); scheduleSave(m);
+      timer = { mid: m.id, running: false, base: 0, since: 0, idx: 0, itemStart: 0 };
+      updateTimerUI(); break;
+    case "cap-action": capture("action"); break;
+    case "cap-decision": capture("decision"); break;
+    case "end":
+      if (timer.running) { timer.base += Date.now() - timer.since; timer.running = false; clearInterval(tickId); tickId = null; }
+      if (m.status === "planned") { m.status = "held"; scheduleSave(m); renderList(); }
+      step = "follow"; renderMain(); window.scrollTo(0, 0); break;
+    case "recap": copy(recapText(m)).then(() => toast("Recap copied, paste it into your email")); break;
+    case "follow-on": {
+      const open = openActions(m).map(a => `- ${a.text}${a.owner ? ` (${a.owner})` : ""}`);
+      createMeeting({
+        team: m.team, type: "Follow-up", title: m.title ? m.title + " follow-up" : "Follow-up",
+        date: m.nextDate || addDays(todayISO(), 14), time: m.time, duration: m.duration, location: m.location,
+        attendees: m.attendees.map(a => ({ ...a })),
+        background: `Follows ${m.title || "meeting"} on ${fmtDate(m.date)}.${m.outcome ? "\n" + m.outcome : ""}${open.length ? "\n\nOpen actions:\n" + open.join("\n") : ""}`
+      });
+      toast("Follow-up meeting created"); break;
+    }
+    case "delete":
+      if (!confirm(`Delete "${m.title || "Untitled meeting"}"? This can't be undone.`)) return;
+      clearTimeout(pending[m.id]); delete pending[m.id];
+      delete meetings[m.id]; store.remove(m.id); currentId = null; renderList(); renderMain(); toast("Meeting deleted"); break;
+  }
+});
+
+store.init();
+</script>
+</body>
+</html>
