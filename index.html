@@ -8,26 +8,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- meeting-hub v2: recurring meetings -->
 <style>
 :root{
   --vulcan:#101820; --white:#fff; --chalice:#b2b2b3; --rock:#a7c5ee; --deluge:#715091;
   --purple:#573d82; --apricot:#ff9e6d; --sunset:#eb6954; --plum:#923b7f;
-  --bg:#f5f7fb; --panel:#fff; --ink:var(--vulcan); --muted:#5d636d; --line:#dde2ea;
-  --field:#fff; --soft:#eef3fb; --accent:var(--purple); --accent-ink:#fff;
-  --top:var(--vulcan);
+  --bg:#f3f4f8; --panel:#fff; --ink:var(--vulcan); --muted:#5d636d; --line:#dde2ea;
+  --field:#fff; --soft:#eef1f8; --hover:#f6f7fb; --accent:var(--purple); --accent-ink:#fff;
+  --top:var(--vulcan); --late:#c8432f;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#0f141b; --panel:#171e27; --ink:#eef1f5; --muted:#a3a9b3; --line:#2a3340;
-    --field:#10161e; --soft:#1e2733; --accent:#8d6cc0; --top:#0a0e13;
+    --field:#10161e; --soft:#1e2733; --hover:#1b232d; --accent:#8d6cc0; --top:#0a0e13; --late:#ff8a73;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0f141b; --panel:#171e27; --ink:#eef1f5; --muted:#a3a9b3; --line:#2a3340;
-  --field:#10161e; --soft:#1e2733; --accent:#8d6cc0; --top:#0a0e13;
+  --field:#10161e; --soft:#1e2733; --hover:#1b232d; --accent:#8d6cc0; --top:#0a0e13; --late:#ff8a73;
 }
 *,*::before,*::after{box-sizing:inherit}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -36,10 +38,14 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--rock);outline-offset:2px}
 h1,h2,h3{margin:0;font-weight:500;line-height:1.2}
-h2{font-size:17px;margin-bottom:10px}
+h2{font-size:20px}
+h3{font-size:15px;margin-bottom:6px}
+ul,ol{margin:0;padding:0;list-style:none}
+.muted{color:var(--muted)}
+.small{font-size:13px}
 
 /* top bar */
-.top{background:var(--top);color:#fff;display:flex;align-items:center;gap:14px;padding:12px 20px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top{background:var(--top);color:#fff;display:flex;align-items:center;gap:14px;padding:12px 20px;position:sticky;top:env(safe-area-inset-top,0px);z-index:6}
 .mark{width:22px;height:22px;border-radius:50%;flex:none;
   background:conic-gradient(from 200deg,#a7c5ee,#715091,#923b7f,#eb6954,#ff9e6d,#a7c5ee)}
 .brand{display:flex;align-items:center;gap:14px;background:none;border:0;color:#fff;padding:0;cursor:pointer;border-radius:6px}
@@ -50,182 +56,222 @@ h2{font-size:17px;margin-bottom:10px}
 .top a:hover{opacity:1}
 .sync{font-size:13px;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,.1);white-space:nowrap}
 .sync.local{background:rgba(255,158,109,.18);color:#ffc7a8}
-
-/* buttons */
-.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap}
-.btn:hover{border-color:var(--deluge)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
-.btn.primary:hover{filter:brightness(1.1)}
-.btn.small{padding:4px 10px;font-size:14px}
-.btn.danger{color:var(--sunset)}
-.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:14px}
-.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px 8px;border-radius:6px}
-.x:hover{color:var(--sunset);background:var(--soft)}
-
-/* layout */
-.app{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 50px)}
-.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-width:0}
-.side-head{padding:16px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
-.search{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
-.filters{display:flex;gap:4px}
-.filters button{flex:1;border:0;background:none;padding:6px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:14px}
-.filters button.on{background:var(--soft);color:var(--ink);font-weight:500}
-.list{overflow:auto;flex:1;padding:6px}
-.mtg{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:none;padding:10px;border-radius:8px;cursor:pointer}
-.mtg:hover{background:var(--soft)}
-.mtg.active{background:var(--soft);box-shadow:inset 3px 0 0 var(--accent)}
-.dt{width:44px;flex:none;text-align:center;line-height:1.1}
-.dt b{display:block;font-size:20px;font-weight:500}
-.dt small{color:var(--muted);font-size:12px}
-.mt{min-width:0;flex:1}
-.mt strong{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mt span{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.flag{width:8px;height:8px;border-radius:50%;flex:none}
-.flag.warn{background:var(--sunset)}
-.flag.held{background:var(--rock)}
-.empty{color:var(--muted);padding:20px 12px;font-size:14px}
-
-.main{min-width:0;padding:28px clamp(16px,4vw,48px) 60px}
-.wrap{max-width:980px}
-
-/* overview */
-.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
-.card.wide{grid-column:1/-1}
-.row-link{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;background:none;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
-.row-link:first-of-type{border-top:0}
-.row-link:hover strong{color:var(--accent)}
-.row-link span{color:var(--muted);font-size:14px;white-space:nowrap}
-.act-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
-.act-row:first-of-type{border-top:0}
-.act-row input{margin-top:5px;accent-color:var(--purple)}
-.act-row .meta{color:var(--muted);font-size:13px}
-.overdue{color:var(--sunset)!important}
-.intro{color:var(--muted);max-width:60ch;margin-top:6px}
-
-/* detail */
-.back{display:inline-block;margin-bottom:12px}
-.head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
-.head-row h1{font-size:30px}
-.sub{color:var(--muted);margin:4px 0 0}
-.pill{font-size:13px;padding:3px 10px;border-radius:20px;background:var(--soft);white-space:nowrap}
-.pill.held{background:rgba(167,197,238,.35)}
-.pill.cancelled{background:rgba(235,105,84,.15);color:var(--sunset)}
-.pill.rescheduled{background:rgba(255,158,109,.2)}
-.steps{display:flex;gap:6px;margin:22px 0 24px;border-bottom:1px solid var(--line)}
-.steps button{border:0;background:none;padding:10px 16px 12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;font-size:15px}
-.steps button b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--soft);font-size:12px;font-weight:500;margin-right:8px}
-.steps button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:500}
-.steps button.on b{background:var(--accent);color:#fff}
-.banner{background:rgba(167,197,238,.25);border:1px solid var(--rock);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;gap:12px;align-items:center}
-
-section.block{margin-bottom:28px}
-.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 16px}
-.fields .span2{grid-column:span 2}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
-input.in,select.in,textarea.in{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font-size:15px}
-textarea.in{min-height:84px;resize:vertical;line-height:1.5}
-.hint{color:var(--muted);font-size:13px;margin:-4px 0 10px}
-.rows{display:flex;flex-direction:column;gap:8px}
-.r{display:grid;gap:8px;align-items:center}
-.r.att{grid-template-columns:1.2fr 1fr auto}
-.r.ag{grid-template-columns:1fr 90px 160px auto}
-.r.q{grid-template-columns:1fr auto}
-.r.ac{grid-template-columns:auto 1fr 150px 150px auto}
-.r.ac.done .in{text-decoration:line-through;color:var(--muted)}
-.r input[type=checkbox]{width:18px;height:18px;accent-color:var(--purple)}
-.adder{margin-top:10px}
-.total{font-size:14px;color:var(--muted);margin-top:8px}
-.total.warn{color:var(--sunset)}
-
-/* run mode: the memorable bit */
-.runner{background:var(--vulcan);color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:24px}
-.clock{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.clock .big{font-size:56px;font-weight:300;letter-spacing:.01em;font-variant-numeric:tabular-nums;line-height:1}
-.clock .of{opacity:.65}
-.clock.over .big{color:var(--apricot)}
-.bar{position:relative;display:flex;gap:3px;height:14px;margin:18px 0 8px}
-.seg{border-radius:4px;opacity:.35;min-width:6px}
-.seg.done{opacity:1}
-.seg.current{opacity:1;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
-.playhead{position:absolute;top:-6px;bottom:-6px;width:2px;background:#fff;border-radius:2px;left:0;transition:left .5s linear}
-.seglabels{display:flex;gap:3px;font-size:12px;opacity:.6}
-.seglabels span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:6px}
-.now{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-top:16px;flex-wrap:wrap}
-.now small{display:block;opacity:.6;font-size:13px}
-.now strong{font-size:20px;font-weight:500}
-.left{font-variant-numeric:tabular-nums;font-size:18px}
-.left.over{color:var(--apricot)}
-.controls{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
-.runner .btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
-.runner .btn:hover{border-color:#fff}
-.runner .btn.go{background:var(--apricot);border-color:var(--apricot);color:var(--vulcan);font-weight:500}
-.run-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:24px}
-textarea.notes{min-height:320px}
-.capture{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.capture input{flex:1;min-width:180px}
-.check{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
-.check input{margin-top:5px;width:16px;height:16px;accent-color:var(--purple)}
-.check.done span{color:var(--muted);text-decoration:line-through}
-.mini{font-size:14px;padding:6px 0;border-top:1px solid var(--line)}
-.mini:first-child{border-top:0}
-.foot-actions{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:18px;margin-top:10px}
 .top .btn.ghost{background:transparent;border-color:rgba(255,255,255,.25);color:#fff}
 .top .btn.ghost:hover,.top .btn.ghost.on{border-color:#fff;background:rgba(255,255,255,.08)}
 .count{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--apricot);color:var(--vulcan);font-size:12px;font-weight:500;text-align:center}
 .count:empty{display:none}
-.act-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
-.act-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.act-tools select{width:auto;min-width:170px}
-.group{margin-top:22px}
-.group h2{display:flex;gap:8px;align-items:baseline}
-.group h2 small{color:var(--muted);font-weight:400;font-size:14px}
-.group.late h2{color:var(--sunset)}
-.act-row .txt{font-weight:500}
-.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--vulcan);color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:10}
-.toast.show{opacity:1;transform:translateX(-50%)}
+.top .short{display:none}
 
-@media (max-width:860px){
-  .app{grid-template-columns:1fr}
-  .side{border-right:0}
-  body.open .side{display:none}
-  body:not(.open) .main{display:none}
-  .ov-grid,.run-grid{grid-template-columns:1fr}
-  .fields .span2{grid-column:auto}
-  .r.att,.r.ag,.r.ac{grid-template-columns:1fr 1fr}
-  .r.att .x,.r.ag .x,.r.ac .x{justify-self:end}
-  .r.ac .txt{grid-column:1/-1;order:-1}
+/* meeting tabs */
+.tabs{display:flex;gap:2px;align-items:flex-end;background:var(--panel);border-bottom:1px solid var(--line);padding:0 20px;overflow-x:auto;position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:5}
+.tab{border:0;background:none;padding:13px 16px 11px;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:8px;font-size:15px}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:500}
+.tab.add{color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sunset);flex:none}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--deluge)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.small{padding:4px 10px;font-size:14px}
+.btn.block{width:100%;padding:10px 14px}
+.btn.danger{color:var(--late)}
+.link{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:14px}
+.link:hover{text-decoration:underline}
+.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:4px 8px;border-radius:6px}
+.x:hover{color:var(--late);background:var(--soft)}
+
+/* page */
+.page{padding:22px clamp(14px,2.5vw,32px) 60px;max-width:1680px}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.stitle{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.stitle h1{font-size:28px}
+.livepill{font-size:13px;padding:3px 10px;border-radius:20px;background:rgba(235,105,84,.14);color:var(--late);font-weight:500;align-self:center}
+.subtabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px}
+.subtabs button{border:0;background:none;padding:6px 14px;border-radius:7px;cursor:pointer;color:var(--muted);font-size:14px}
+.subtabs button.on{background:var(--soft);color:var(--ink);font-weight:500}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.pad{padding:18px 20px}
+
+/* meeting board */
+.board{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start}
+.board.with-panel{grid-template-columns:250px minmax(0,1fr) 400px}
+.centre{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+/* agenda */
+.agenda{padding:16px 0 12px;position:sticky;top:calc(112px + env(safe-area-inset-top,0px))}
+.ag-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 16px 12px}
+.agenda .startwrap{padding:0 16px 12px}
+.ag-list{border-top:1px solid var(--line)}
+.ag-item{position:relative;display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;border:0;background:none;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line);overflow:hidden}
+.ag-item:hover{background:var(--hover)}
+.ag-item.on{background:var(--soft);font-weight:500;box-shadow:inset 3px 0 0 var(--accent)}
+.ag-item.past{color:var(--muted)}
+.ag-item.past span:first-child{text-decoration:line-through;text-decoration-color:var(--chalice)}
+.ag-item .mins{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.prog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:0;transition:width 1s linear}
+.prog.over{background:var(--sunset)}
+.notes-btn{display:flex;align-items:center;gap:8px;justify-content:center;width:calc(100% - 32px);margin:12px 16px 4px;border:1px dashed var(--line);border-radius:8px;background:none;padding:9px;cursor:pointer;font-weight:500}
+.notes-btn:hover,.notes-btn.on{border-style:solid;border-color:var(--accent);color:var(--accent)}
+.agenda .edit{display:block;margin:8px auto 0}
+
+/* the live clock: the one bold element */
+.clock{background:var(--vulcan);color:#fff;border-radius:10px;margin:0 12px 12px;padding:14px 14px 12px}
+.clock .big{font-size:42px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.clock .big.over{color:var(--apricot)}
+.clock .of{font-size:13px;opacity:.6;margin-top:2px}
+.clock .sec{display:flex;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15);font-size:14px}
+.clock .sec span{opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clock .sec b{font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.clock .sec b.over{color:var(--apricot)}
+.clock .ctl{display:flex;gap:6px;margin-top:12px}
+.clock .btn{flex:1;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff;padding:6px 8px;font-size:14px}
+.clock .btn:hover{border-color:#fff}
+.clock .btn.go{background:var(--apricot);border-color:var(--apricot);color:var(--vulcan);font-weight:500}
+
+/* last summary */
+details.sum>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:16px 20px}
+details.sum>summary::-webkit-details-marker{display:none}
+details.sum>summary .chev{margin-left:auto;transition:transform .15s;color:var(--muted)}
+details.sum[open]>summary .chev{transform:rotate(180deg)}
+.sum-body{padding:0 20px 18px;border-top:1px solid var(--line)}
+.facts{display:flex;flex-wrap:wrap;gap:8px 28px;padding:14px 0;font-size:14px}
+.facts b{font-weight:500;font-size:16px;margin-right:4px}
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px}
+.sum-grid li{font-size:14px;padding:3px 0}
+.sum-grid li small{color:var(--muted)}
+.prose{white-space:pre-wrap;font-size:14px;background:var(--soft);border-radius:8px;padding:10px 12px;margin:0}
+.sum-block{margin-top:14px}
+
+/* list cards */
+.lc-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px 12px}
+.lc-head .grow{flex:1}
+.pct{font-size:13px;font-weight:500;color:var(--muted)}
+.sortl{font-size:14px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.sortl select{border:0;background:none;font-weight:500;color:var(--ink);cursor:pointer}
+.seg{display:flex;background:var(--soft);border-radius:8px;padding:3px}
+.seg button{border:0;background:none;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:14px;color:var(--muted)}
+.seg button.on{background:var(--panel);color:var(--ink);font-weight:500;box-shadow:0 1px 2px rgba(16,24,32,.12)}
+.adder-row{display:flex;gap:8px;align-items:center;background:var(--soft);padding:10px 20px}
+.adder-row .grow{flex:1;min-width:120px}
+.in{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font-size:15px}
+textarea.in{resize:vertical;line-height:1.5;min-height:70px}
+textarea.in.tall{min-height:180px}
+textarea.in.notes{min-height:360px}
+select.in.owner{width:auto;max-width:170px}
+input.in.date{width:auto}
+.rows li{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 20px;border-top:1px solid var(--line)}
+.rows li:first-child{border-top:0}
+.rows li.sel{background:var(--soft)}
+.rows li.done .row-main{color:var(--muted);text-decoration:line-through}
+.rows.wide li{grid-template-columns:auto auto minmax(0,1fr) auto auto}
+.tick{width:22px;height:22px;border-radius:50%;border:2px solid var(--chalice);background:none;cursor:pointer;display:grid;place-items:center;padding:0;color:#fff;font-size:12px;line-height:1}
+.tick:hover{border-color:var(--accent)}
+.done .tick{background:var(--accent);border-color:var(--accent)}
+.row-main{border:0;background:none;text-align:left;padding:2px 0;cursor:pointer;min-width:0}
+.row-main:hover{color:var(--accent)}
+.due{font-size:14px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.due.late{color:var(--late);font-weight:500}
+.star{border:0;background:none;cursor:pointer;color:var(--chalice);font-size:18px;padding:0 4px;line-height:1}
+.star.on{color:var(--apricot)}
+.chip{font-size:12px;padding:2px 8px;border-radius:12px;background:var(--soft);color:var(--muted);border:0;cursor:pointer;white-space:nowrap}
+.chip:hover{color:var(--accent)}
+.av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:11px;font-weight:500;flex:none;letter-spacing:.02em}
+.av.none{background:var(--soft);color:var(--muted);border:1px dashed var(--chalice)}
+.empty{color:var(--muted);padding:18px 20px;font-size:14px}
+
+/* side panel */
+.panel{padding:16px 18px 14px;position:sticky;top:calc(112px + env(safe-area-inset-top,0px));max-height:calc(100vh - 130px);overflow:auto;display:flex;flex-direction:column;gap:14px}
+.p-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.p-tools{display:flex;gap:6px;align-items:center}
+.p-timer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.timer{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.timer button{border:0;background:none;cursor:pointer;padding:8px 11px;font-size:16px;line-height:1}
+.timer button:hover{background:var(--soft)}
+.timer b{font-weight:500;font-variant-numeric:tabular-nums;padding:0 4px;min-width:52px;text-align:center}
+.timer b.done{color:var(--late)}
+.timer .div{width:1px;align-self:stretch;background:var(--line)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:14px;font-weight:500}
+label.f .lab{display:flex;justify-content:space-between;align-items:baseline}
+label.f small{font-weight:400;color:var(--muted);font-size:12px}
+label.chk{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+label.chk input{width:18px;height:18px;accent-color:var(--purple)}
+.p-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:12px;margin-top:auto}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* wrap-up */
+.ratings{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.rate{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--line);border-radius:8px}
+.rate > span:not(.av){flex:1;font-size:14px}
+.rate select{width:auto}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+/* summary + archive + settings */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t th{text-align:left;font-weight:500;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+table.t td{padding:8px;border-bottom:1px solid var(--line)}
+table.t td.num,table.t th.num{text-align:right;font-variant-numeric:tabular-nums}
+details.arch{border-top:1px solid var(--line)}
+details.arch:first-of-type{border-top:0}
+details.arch>summary{cursor:pointer;padding:12px 20px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+details.arch>summary b{font-weight:500}
+details.arch .sum-body{border-top:0}
+.ag-edit li{display:grid;grid-template-columns:minmax(0,1fr) 80px 150px auto auto auto;gap:8px;align-items:center;padding:6px 0}
+.member-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.member{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 4px;border:1px solid var(--line);border-radius:22px;font-size:14px}
+.member .x{font-size:16px;padding:2px 6px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 16px}
+.welcome{max-width:520px;margin:60px auto;text-align:left}
+.welcome h1{font-size:28px;margin-bottom:8px}
+.welcome .adder{display:flex;gap:8px;margin-top:18px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--vulcan);color:#fff;padding:10px 18px;border-radius:8px;opacity:0;pointer-events:none;transition:.2s;z-index:20}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.scrim{display:none}
+
+@media (max-width:1200px){
+  .board.with-panel{grid-template-columns:250px minmax(0,1fr)}
+  .board .panel{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);max-height:none;border-radius:0;z-index:15;
+    padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));box-shadow:-8px 0 30px rgba(16,24,32,.25)}
+  .with-panel .scrim{display:block;position:fixed;inset:0;background:rgba(16,24,32,.35);z-index:14;border:0}
+}
+@media (max-width:780px){
+  .board,.board.with-panel{grid-template-columns:1fr}
+  .agenda{position:static}
   .top .hub{display:none}
-  .clock .big{font-size:44px}
+  .top{gap:8px;padding:10px 12px}
+  .top .name{white-space:nowrap;font-size:16px}
+  .top .name span{display:none}
+  .top .long{display:none}
+  .top .short{display:inline}
+  .brand{gap:8px}
+  .top .btn{padding:6px 10px}
+  .sync{font-size:12px;padding:3px 8px}
+  .tabs{top:calc(54px + env(safe-area-inset-top,0px))}
+  .adder-row{flex-wrap:wrap}
+  .rows li,.rows.wide li{grid-template-columns:auto auto minmax(0,1fr);}
+  .rows li .due,.rows li .star,.rows li .chip{grid-column:3}
+  .ag-edit li{grid-template-columns:1fr 70px auto auto auto}
+  .ag-edit li select{grid-column:1/-1;order:5}
+  .two{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <header class="top">
-  <button class="brand" data-act="home" aria-label="Go to overview"><span class="mark" aria-hidden="true"></span><span class="name">Meeting Hub<span>Anchorpoint</span></span></button>
+  <button class="brand" data-act="home" aria-label="Go to meetings"><span class="mark" aria-hidden="true"></span><span class="name">Meeting Hub<span>Anchorpoint</span></span></button>
   <div class="spacer"></div>
   <a class="hub" href="https://roxannepaterson.github.io/bd-tools-hub/">Tools hub</a>
   <span class="sync" id="sync">Connecting</span>
-  <button class="btn ghost" data-act="home" id="nav-home">Overview</button>
-  <button class="btn ghost" data-act="actions-view" id="nav-actions">Actions<span class="count" id="act-count"></span></button>
-  <button class="btn primary" data-act="new">New meeting</button>
+  <button class="btn ghost" data-act="all-todos" id="nav-todos"><span class="long">All to-dos</span><span class="short">To-dos</span><span class="count" id="todo-count"></span></button>
 </header>
-
-<div class="app">
-  <aside class="side">
-    <div class="side-head">
-      <input class="search" id="search" type="search" placeholder="Search title, team or attendee" aria-label="Search meetings">
-      <div class="filters" role="tablist">
-        <button data-act="filter" data-filter="upcoming" class="on">Upcoming</button>
-        <button data-act="filter" data-filter="past">Past</button>
-        <button data-act="filter" data-filter="all">All</button>
-      </div>
-    </div>
-    <div class="list" id="list"></div>
-  </aside>
-  <main class="main"><div class="wrap" id="main"></div></main>
-</div>
+<nav class="tabs" id="tabs" aria-label="Meetings"></nav>
+<main class="page" id="main"><p class="muted">Loading meetings…</p></main>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -242,52 +288,77 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "PASTE_SENDER_ID",
   appId: "PASTE_APP_ID"
 };
-const DB_PATH = "meetingHub/meetings";
-const LS_KEY = "anchorpoint-meeting-hub";
-const CLIENT = Math.random().toString(36).slice(2, 10);
-const TYPES = ["Team meeting", "1:1", "Project", "Planning", "Review", "Workshop", "Follow-up", "Other"];
-const STATUSES = { planned: "Planned", held: "Held", rescheduled: "Rescheduled", cancelled: "Cancelled" };
-const SEG_COLOURS = ["#715091", "#a7c5ee", "#ff9e6d", "#923b7f", "#573d82", "#eb6954"];
+const ROOT = "meetingHub/v2";
+const LS_KEY = "anchorpoint-meeting-hub-v2";
+const UI_KEY = "anchorpoint-meeting-hub-ui";
+const KINDS = { notes: "Notes", todos: "To-do review", issues: "Issues list", wrapup: "Wrap-up" };
+const CADENCES = ["Weekly", "Fortnightly", "Monthly", "Ad hoc"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const AV_COLOURS = ["#573d82", "#923b7f", "#715091", "#c24f3c", "#3b6aa8", "#9a5b22", "#2f7a6b"];
 
-let meetings = {}, currentId = null, step = "prep", filter = "upcoming", query = "";
-let pending = {}, loaded = false, view = "meetings", ownerFilter = "";
+let data = { series: {}, todos: {}, issues: {}, sessions: {} };
+let ui = { seriesId: null, tab: "meeting", section: 0, centre: "section", panel: null, issueView: "short",
+  todoSort: "due", view: "series", ownerFilter: "", summaryOpen: false,
+  newTodo: { text: "", owner: "", due: "" }, newIssue: { text: "", owner: "" }, newMember: "", newName: "" };
+try { const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}"); ["seriesId", "todoSort", "issueView"].forEach(k => { if (saved[k]) ui[k] = saved[k]; }); } catch (e) {}
+let rendering = false, pending = {}, loaded = false, offset = 0, lastLive = "", needRender = false, localTimer = null;
+const itimer = { id: null, total: 300, left: 300, running: false, endsAt: 0 };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pad = n => String(n).padStart(2, "0");
+const now = () => Date.now() + offset;
 function todayISO() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function addDays(iso, n) { const d = new Date(iso + "T00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-function fmtDate(iso, opts) { if (!iso) return "No date"; return new Date(iso + "T00:00").toLocaleDateString("en-GB", opts || { weekday: "short", day: "numeric", month: "short", year: "numeric" }); }
-const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.values(v) : []);
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2200); }
+function fmtDate(iso) { if (!iso) return ""; return new Date(iso + "T00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }); }
+function fmtShort(iso) { if (!iso) return "No date"; const d = new Date(iso + "T00:00"); const y = d.getFullYear() !== new Date().getFullYear(); return d.toLocaleDateString("en-GB", y ? { day: "numeric", month: "short", year: "numeric" } : { weekday: "short", day: "numeric", month: "short" }); }
+function fmtStamp(ms) { if (!ms) return ""; const d = new Date(ms); return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+function fmtClock(sec) { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`; }
+const toArr = v => Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === "object" ? Object.keys(v).sort((a, b) => a - b).map(k => v[k]).filter(Boolean) : []);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fbKey = s => String(s).replace(/[.#$\[\]\/]/g, "_");
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 2400); }
 function setSync(text, local) { const s = $("sync"); s.textContent = text; s.classList.toggle("local", !!local); }
-
-function blank(extra) {
-  return Object.assign({
-    id: uid(), team: "", title: "", date: todayISO(), time: "10:00", duration: 60,
-    location: "", type: "Team meeting", status: "planned",
-    attendees: [], objective: "", background: "", questions: [], agenda: [],
-    notes: "", outcome: "", decisions: "", actions: [], nextDate: "",
-    createdAt: Date.now(), updatedAt: Date.now(), updatedBy: CLIENT
-  }, extra || {});
+function getIn(o, p) { return p.reduce((a, k) => a == null ? undefined : a[k], o); }
+function setIn(o, p, v) {
+  let a = o;
+  for (let i = 0; i < p.length - 1; i++) { if (a[p[i]] == null || typeof a[p[i]] !== "object") a[p[i]] = {}; a = a[p[i]]; }
+  const k = p[p.length - 1];
+  if (v === null || v === undefined) { if (Array.isArray(a)) a[k] = undefined; else delete a[k]; } else a[k] = v;
 }
-function normalize(m) {
-  const o = Object.assign(blank(), m);
-  ["attendees", "questions", "agenda", "actions"].forEach(k => o[k] = toArr(o[k]));
+function initials(name) { const p = String(name || "").trim().split(/\s+/).filter(Boolean); if (!p.length) return "?"; return ((p[0][0] || "") + (p.length > 1 ? p[p.length - 1][0] : (p[0][1] || ""))).toUpperCase(); }
+function avColour(name) { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return AV_COLOURS[h % AV_COLOURS.length]; }
+function avatar(name) { return name ? `<span class="av" style="background:${avColour(name)}" title="${esc(name)}">${esc(initials(name))}</span>` : `<span class="av none" title="No owner">?</span>`; }
+
+/* ---------- data access ---------- */
+function normSeries(s, id) {
+  const o = Object.assign({ id, name: "Untitled meeting", cadence: "Weekly", day: "Monday", time: "10:00", createdAt: 0 }, s);
+  o.members = toArr(o.members).map(String);
+  o.agenda = toArr(o.agenda).map(it => Object.assign({ id: uid(), title: "", mins: 5, kind: "notes" }, it));
+  o.draft = o.draft || {};
   return o;
 }
-const current = () => currentId ? meetings[currentId] : null;
-const all = () => Object.values(meetings);
-const openActions = m => m.actions.filter(a => !a.done && (a.text || "").trim());
-function needsFollowUp(m) {
-  if (m.date >= todayISO()) return false;
-  if (m.status === "planned") return true;
-  return m.status === "held" && !m.actions.some(a => (a.text || "").trim());
+function normRoot(raw) {
+  raw = raw || {};
+  const out = { series: {}, todos: {}, issues: {}, sessions: {} };
+  Object.entries(raw.series || {}).forEach(([id, s]) => { if (s) out.series[id] = normSeries(s, id); });
+  ["todos", "issues", "sessions"].forEach(k => Object.entries(raw[k] || {}).forEach(([id, r]) => { if (r) out[k][id] = Object.assign({ id }, r); }));
+  return out;
 }
+const seriesList = () => Object.values(data.series).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+function cur() {
+  if (ui.seriesId && data.series[ui.seriesId]) return data.series[ui.seriesId];
+  const first = seriesList()[0]; ui.seriesId = first ? first.id : null; return first || null;
+}
+const liveOf = s => s && s.live && s.live.sessionId ? s.live : null;
+const seriesTodos = sid => Object.values(data.todos).filter(t => t.seriesId === sid && !t.archived);
+const seriesIssues = sid => Object.values(data.issues).filter(i => i.seriesId === sid && !i.archived);
+const seriesSessions = sid => Object.values(data.sessions).filter(x => x.seriesId === sid).sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0));
+const isLate = t => !t.done && t.due && t.due < todayISO();
+function saveUI() { try { localStorage.setItem(UI_KEY, JSON.stringify({ seriesId: ui.seriesId, todoSort: ui.todoSort, issueView: ui.issueView })); } catch (e) {} }
 
-/* ---------- storage ---------- */
+/* ---------- storage: every write is a small path, so two people editing different things never overwrite each other ---------- */
 const store = {
   db: null,
   init() {
@@ -296,10 +367,15 @@ const store = {
       try {
         firebase.initializeApp(FIREBASE_CONFIG);
         this.db = firebase.database();
-        this.db.ref(DB_PATH).on("value", s => onData(s.val() || {}), err => {
-          console.error(err); setSync("Can't reach Firebase", true); this.db = null; this.loadLocal();
-        });
-        this.db.ref(".info/connected").on("value", s => setSync(s.val() ? "Live, shared with team" : "Offline, will sync", !s.val()));
+        const listen = () => {
+          this.db.ref(ROOT).on("value", s => onData(s.val()), err => {
+            console.error(err); setSync("Can't reach Firebase", true); this.db = null; this.loadLocal();
+          });
+          this.db.ref(".info/connected").on("value", s => setSync(s.val() ? "Live, shared with team" : "Offline, will sync", !s.val()));
+          this.db.ref(".info/serverTimeOffset").on("value", s => { offset = s.val() || 0; });
+        };
+        if (firebase.auth) firebase.auth().signInAnonymously().then(listen).catch(e => { console.warn(e); listen(); });
+        else listen();
         return;
       } catch (e) { console.error(e); this.db = null; }
     }
@@ -307,475 +383,608 @@ const store = {
     this.loadLocal();
   },
   loadLocal() { let d = {}; try { d = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) {} onData(d); },
-  save(m) {
-    m.updatedAt = Date.now(); m.updatedBy = CLIENT;
-    const clean = JSON.parse(JSON.stringify(m));
-    if (this.db) {
-      setSync("Saving…");
-      this.db.ref(`${DB_PATH}/${m.id}`).set(clean).then(() => setSync("Live, shared with team")).catch(e => { console.error(e); setSync("Save failed, check connection", true); });
-    } else {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(meetings)); } catch (e) { setSync("Couldn't save in this browser", true); }
-    }
-  },
-  remove(id) {
-    if (this.db) this.db.ref(`${DB_PATH}/${id}`).remove();
-    else { try { localStorage.setItem(LS_KEY, JSON.stringify(meetings)); } catch (e) {} }
+  saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (e) { setSync("Couldn't save in this browser", true); } },
+  flush(key) {
+    const p = pending[key]; if (!p) return; clearTimeout(p.t); delete pending[key];
+    const val = p.value == null ? null : JSON.parse(JSON.stringify(p.value));
+    setSync("Saving…");
+    this.db.ref(`${ROOT}/${key}`).set(val).then(() => setSync("Live, shared with team")).catch(e => { console.error(e); setSync("Save failed, check connection", true); toast("That change didn't save. Check your connection."); });
   }
 };
-
-function scheduleSave(m) {
-  m = m || current(); if (!m) return;
-  clearTimeout(pending[m.id]);
-  pending[m.id] = setTimeout(() => { delete pending[m.id]; if (meetings[m.id]) store.save(meetings[m.id]); }, 500);
+function write(path, value, delay = 450) {
+  setIn(data, path, value);
+  if (store.db) {
+    const key = path.join("/");
+    if (pending[key]) clearTimeout(pending[key].t);
+    pending[key] = { path, value, t: setTimeout(() => store.flush(key), delay) };
+  } else {
+    clearTimeout(localTimer); localTimer = setTimeout(() => store.saveLocal(), delay);
+  }
 }
-function flushAll() { Object.keys(pending).forEach(id => { clearTimeout(pending[id]); delete pending[id]; if (meetings[id]) store.save(meetings[id]); }); }
-window.addEventListener("beforeunload", flushAll);
+window.addEventListener("beforeunload", () => { if (store.db) Object.keys(pending).forEach(k => store.flush(k)); else store.saveLocal(); });
 
+function typingNow() { const a = document.activeElement; return a && a.matches && a.matches("textarea, input:not([type=checkbox]):not([type=date]):not([type=number])") && $("main").contains(a); }
 function onData(raw) {
-  const incoming = {};
-  Object.entries(raw).forEach(([id, m]) => { if (m) incoming[id] = normalize(Object.assign({ id }, m)); });
-  const prev = current();
-  const remoteChange = prev && incoming[currentId] && incoming[currentId].updatedBy !== CLIENT && incoming[currentId].updatedAt > prev.updatedAt;
-  // keep our own in-flight edits for the open meeting
-  if (prev && incoming[currentId] && (pending[currentId] || incoming[currentId].updatedBy === CLIENT)) incoming[currentId] = prev;
-  meetings = incoming;
-  renderList();
-  if (!loaded) { loaded = true; renderMain(); return; }
-  if (currentId && !meetings[currentId]) { currentId = null; renderMain(); return; }
-  if (!currentId) { renderMain(); return; }
-  if (remoteChange) {
-    const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest(".main") && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-    if (typing) showBanner(); else renderMain();
-  }
+  data = normRoot(raw);
+  Object.values(pending).forEach(p => setIn(data, p.path, p.value));
+  loaded = true;
+  const s = cur(), lv = liveOf(s);
+  const sig = lv ? lv.sessionId + ":" + lv.sectionIdx : "";
+  const liveChanged = sig !== lastLive;
+  if (liveChanged) { if (lv) ui.centre = "section"; lastLive = sig; }
+  if (ui.panel) { const rec = data[ui.panel.kind === "issue" ? "issues" : "todos"][ui.panel.id]; if (!rec) ui.panel = null; }
+  if (!liveChanged && typingNow()) { needRender = true; updateCount(); return; }
+  render();
+}
+document.addEventListener("focusout", () => setTimeout(() => { if (needRender && !typingNow()) render(); }, 0));
+
+/* ---------- render ---------- */
+function render() {
+  if (!loaded) return;
+  needRender = false;
+  const a = document.activeElement, keep = a && a.id && $("main").contains(a) ? { id: a.id, s: a.selectionStart, e: a.selectionEnd, top: a.scrollTop } : null;
+  renderTabs();
+  const s = cur();
+  rendering = true;
+  $("main").innerHTML = ui.view === "todos" ? viewAllTodos() : s ? viewSeries(s) : viewWelcome();
+  rendering = false;
+  $("nav-todos").classList.toggle("on", ui.view === "todos");
+  updateCount();
+  if (keep) { const el = $(keep.id); if (el) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch (e) {} el.scrollTop = keep.top; } }
+  tick();
+  saveUI();
+}
+function updateCount() { const n = Object.values(data.todos).filter(t => !t.archived && !t.done).length; $("todo-count").textContent = n || ""; }
+
+function renderTabs() {
+  const list = seriesList(), s = cur();
+  $("tabs").innerHTML = list.map(x => `<button class="tab ${ui.view === "series" && s && x.id === s.id ? "on" : ""}" data-act="series" data-id="${x.id}">${liveOf(x) ? `<span class="dot" title="Meeting in progress"></span>` : ""}${esc(x.name)}</button>`).join("")
+    + `<button class="tab add" data-act="new-series">+ New meeting</button>`;
 }
 
-/* ---------- sidebar ---------- */
-function matches(m) {
-  if (!query) return true;
-  const hay = [m.title, m.team, m.type, ...m.attendees.map(a => a.name + " " + a.role)].join(" ").toLowerCase();
-  return hay.includes(query.toLowerCase());
-}
-function renderList() {
-  const t = todayISO();
-  const n = all().reduce((c, m) => c + openActions(m).length, 0);
-  $("act-count").textContent = n || "";
-  $("nav-actions").classList.toggle("on", view === "actions" && !currentId);
-  let items = all().filter(matches);
-  if (filter === "upcoming") items = items.filter(m => m.date >= t).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  else if (filter === "past") items = items.filter(m => m.date < t).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  else items.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  if (!items.length) {
-    $("list").innerHTML = `<p class="empty">${query ? "No meetings match that search." : filter === "upcoming" ? "Nothing booked. Add one with New meeting." : "No meetings here yet."}</p>`;
-    return;
-  }
-  $("list").innerHTML = items.map(m => {
-    const d = m.date ? new Date(m.date + "T00:00") : null;
-    const flag = needsFollowUp(m) ? `<span class="flag warn" title="Needs follow-up"></span>` : m.status === "held" ? `<span class="flag held" title="Held"></span>` : "";
-    return `<button class="mtg ${m.id === currentId ? "active" : ""}" data-act="open" data-id="${m.id}">
-      <span class="dt"><b>${d ? d.getDate() : "?"}</b><small>${d ? d.toLocaleDateString("en-GB", { month: "short" }) : ""}</small></span>
-      <span class="mt"><strong>${esc(m.title) || "Untitled meeting"}</strong><span>${esc(m.team || m.type)}${m.time ? ", " + esc(m.time) : ""}${m.status === "cancelled" ? " (cancelled)" : ""}</span></span>
-      ${flag}</button>`;
-  }).join("");
+function cadenceText(s) {
+  const bits = [s.cadence];
+  if (s.cadence !== "Ad hoc" && s.day) bits.push(`${s.day}s`);
+  return bits.join(", ") + (s.time ? ` at ${s.time}` : "");
 }
 
-/* ---------- main ---------- */
-function renderMain() {
-  document.body.classList.toggle("open", !!currentId || view === "actions");
-  const m = current();
-  $("main").innerHTML = m ? renderDetail(m) : view === "actions" ? renderActions() : renderOverview();
-  $("nav-actions").classList.toggle("on", view === "actions" && !m);
-  $("nav-home").classList.toggle("on", view !== "actions" && !m);
-  if (m && step === "run") { ensureTimer(m); updateTimerUI(); }
-}
-
-function renderOverview() {
-  const t = todayISO(), in7 = addDays(t, 7);
-  const week = all().filter(m => m.date >= t && m.date <= in7 && m.status !== "cancelled").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  const acts = [];
-  all().forEach(m => m.actions.forEach((a, i) => { if (!a.done && (a.text || "").trim()) acts.push({ m, a, i }); }));
-  acts.sort((x, y) => (x.a.due || "9999").localeCompare(y.a.due || "9999"));
-  const needs = all().filter(needsFollowUp).sort((a, b) => b.date.localeCompare(a.date));
-
-  const weekHtml = week.length ? week.map(m => `<button class="row-link" data-act="open" data-id="${m.id}"><strong>${esc(m.title) || "Untitled meeting"}${m.team ? `, ${esc(m.team)}` : ""}</strong><span>${fmtDate(m.date, { weekday: "short", day: "numeric", month: "short" })} ${esc(m.time)}</span></button>`).join("")
-    : `<p class="empty">No meetings in the next seven days.</p>`;
-  const actHtml = acts.length ? acts.map(({ m, a, i }) => {
-    const late = a.due && a.due < t;
-    return `<div class="act-row"><input type="checkbox" aria-label="Mark done" data-mid="${m.id}" data-list="actions" data-i="${i}" data-k="done">
-      <div><div>${esc(a.text)}</div><div class="meta"><button class="link" data-act="open" data-id="${m.id}" data-step="follow">${esc(m.title) || "Untitled meeting"}</button>${a.owner ? `, ${esc(a.owner)}` : ""}${a.due ? `, <span class="${late ? "overdue" : ""}">due ${fmtDate(a.due, { day: "numeric", month: "short" })}</span>` : ""}</div></div></div>`;
-  }).join("") : `<p class="empty">No open actions. Actions captured in meetings appear here.</p>`;
-  const needsHtml = needs.length ? needs.map(m => `<button class="row-link" data-act="open" data-id="${m.id}" data-step="follow"><strong>${esc(m.title) || "Untitled meeting"}${m.team ? `, ${esc(m.team)}` : ""}</strong><span>${m.status === "planned" ? "Outcome not logged" : "No actions logged"}</span></button>`).join("")
-    : `<p class="empty">Every past meeting has an outcome and actions.</p>`;
-
-  return `<h1 style="font-size:30px">Meetings</h1>
-    <p class="intro">Prep each internal meeting, run it with a timed agenda and live notes, then log decisions and actions so nothing gets lost afterwards.</p>
-    <div class="ov-grid">
-      <div class="card"><h2>Next seven days</h2>${weekHtml}</div>
-      <div class="card"><h2>Needs follow-up</h2>${needsHtml}</div>
-      <div class="card wide"><div class="act-head"><h2>Open actions (${acts.length})</h2>${acts.length ? `<button class="link" data-act="actions-view">See all actions</button>` : ""}</div>${actHtml}</div>
-    </div>`;
-}
-
-function subline(m) {
-  return [m.team, fmtDate(m.date), m.time, m.duration ? m.duration + " min" : "", m.type, m.location].filter(Boolean).map(esc).join(", ");
-}
-function renderDetail(m) {
-  const tabs = [["prep", "Prep"], ["run", "Run"], ["follow", "Follow up"]];
-  return `<button class="link back" data-act="back">Back to overview</button>
-    <div class="head-row">
-      <div><h1 id="h-title">${esc(m.title) || "New meeting"}</h1><p class="sub" id="h-sub">${subline(m)}</p></div>
-      <span class="pill ${m.status}" id="h-status">${STATUSES[m.status] || "Planned"}</span>
-    </div>
-    <nav class="steps">${tabs.map(([k, l], i) => `<button data-act="step" data-step="${k}" class="${step === k ? "on" : ""}"><b>${i + 1}</b>${l}</button>`).join("")}</nav>
-    <div id="banner"></div>
-    ${step === "prep" ? renderPrep(m) : step === "run" ? renderRun(m) : renderFollow(m)}`;
-}
-function updateHeader() {
-  const m = current(); if (!m) return;
-  if ($("h-title")) $("h-title").textContent = m.title || "New meeting";
-  if ($("h-sub")) $("h-sub").innerHTML = subline(m);
-  if ($("h-status")) { $("h-status").textContent = STATUSES[m.status]; $("h-status").className = "pill " + m.status; }
-}
-function showBanner() {
-  const b = $("banner"); if (!b) return;
-  b.innerHTML = `<div class="banner"><span>A colleague has updated this meeting.</span><button class="btn small" data-act="reload">Show latest</button></div>`;
-}
-
-const input = (f, v, type = "text", ph = "") => `<input class="in" type="${type}" data-f="${f}" value="${esc(v)}" placeholder="${esc(ph)}">`;
-const area = (f, v, ph = "", cls = "") => `<textarea class="in ${cls}" data-f="${f}" placeholder="${esc(ph)}">${esc(v)}</textarea>`;
-const li = (list, i, k, v, type = "text", ph = "", extra = "") => `<input class="in ${extra}" type="${type}" data-list="${list}" data-i="${i}" data-k="${k}" value="${esc(v)}" placeholder="${esc(ph)}" aria-label="${esc(ph || k)}">`;
-const rm = (list, i) => `<button class="x" data-act="remove" data-list="${list}" data-i="${i}" aria-label="Remove">&times;</button>`;
-const agendaMins = m => m.agenda.reduce((s, a) => s + (Number(a.mins) || 0), 0);
-
-function renderPrep(m) {
-  const total = agendaMins(m), over = m.duration && total > m.duration;
-  return `
-  <section class="block"><h2>Details</h2>
-    <div class="fields">
-      <label class="f">Meeting title${input("title", m.title, "text", "e.g. Monday team catch-up")}</label>
-      <label class="f">Team or project${input("team", m.team, "text", "e.g. Marketing")}</label>
-      <label class="f">Type<select class="in" data-f="type">${TYPES.map(t => `<option ${t === m.type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-      <label class="f">Date${input("date", m.date, "date")}</label>
-      <label class="f">Start time${input("time", m.time, "time")}</label>
-      <label class="f">Length (minutes)${input("duration", m.duration, "number")}</label>
-      <label class="f span2">Where${input("location", m.location, "text", "Room, office or Teams link")}</label>
-    </div>
-  </section>
-  <section class="block"><h2>Attendees</h2>
-    <div class="rows">${m.attendees.map((a, i) => `<div class="r att">${li("attendees", i, "name", a.name, "text", "Name")}${li("attendees", i, "role", a.role, "text", "Role")}
-      ${rm("attendees", i)}</div>`).join("")}</div>
-    <button class="btn small adder" data-act="add" data-list="attendees">Add attendee</button>
-  </section>
-  <section class="block"><h2>Objective</h2>
-    <p class="hint">What does a good outcome look like when you walk out?</p>
-    ${area("objective", m.objective, "e.g. Agree priorities for next quarter and who owns each one")}
-  </section>
-  <section class="block"><h2>Context</h2>
-    ${area("background", m.background, "Background, previous decisions, anything people should read beforehand")}
-  </section>
-  <section class="block"><h2>Questions to raise</h2>
-    <div class="rows">${m.questions.map((q, i) => `<div class="r q">${li("questions", i, "text", q.text, "text", "Question")}${rm("questions", i)}</div>`).join("")}</div>
-    <button class="btn small adder" data-act="add" data-list="questions">Add question</button>
-  </section>
-  <section class="block"><h2>Agenda</h2>
-    <div class="rows">${m.agenda.map((a, i) => `<div class="r ag">${li("agenda", i, "topic", a.topic, "text", "Topic")}${li("agenda", i, "mins", a.mins, "number", "Min")}${li("agenda", i, "owner", a.owner, "text", "Led by")}${rm("agenda", i)}</div>`).join("")}</div>
-    <button class="btn small adder" data-act="add" data-list="agenda">Add agenda item</button>
-    <p class="total ${over ? "warn" : ""}" id="ag-total">${m.agenda.length ? `Agenda totals ${total} of ${m.duration || 0} minutes${over ? ". Trim something or extend the meeting." : "."}` : "Add agenda items to use the timer in Run."}</p>
-  </section>
-  <div class="foot-actions"><span></span><button class="btn primary" data-act="step" data-step="run">Start the meeting</button></div>`;
-}
-
-function renderRun(m) {
-  const total = agendaMins(m) || 1;
-  const segs = m.agenda.map((a, i) => `<span class="seg" data-seg="${i}" style="flex:${Math.max(Number(a.mins) || 1, 1)};background:${SEG_COLOURS[i % SEG_COLOURS.length]}"></span>`).join("");
-  const labels = m.agenda.map(a => `<span style="flex:${Math.max(Number(a.mins) || 1, 1)}">${esc(a.topic)}</span>`).join("");
-  return `
-  <section class="runner">
-    <div class="clock" id="t-clock"><span class="big" id="t-elapsed">00:00</span><span class="of">of ${agendaMins(m) || m.duration || 0} min planned</span></div>
-    ${m.agenda.length ? `<div class="bar">${segs}<i class="playhead" id="t-head"></i></div><div class="seglabels">${labels}</div>` : ""}
-    <div class="now"><div><small>Now</small><strong id="t-item"></strong></div><div class="left" id="t-left"></div></div>
-    <div class="controls">
-      <button class="btn go" data-act="t-toggle" id="t-toggle">Start</button>
-      <button class="btn" data-act="t-next" ${m.agenda.length ? "" : "disabled"}>Next item</button>
-      <button class="btn" data-act="t-reset">Reset</button>
-    </div>
-  </section>
-  <div class="run-grid">
-    <section>
-      <h2>Notes</h2>
-      ${area("notes", m.notes, "Type as you go. Saves automatically.", "notes")}
-      <div class="capture">
-        <input class="in" id="cap" placeholder="Capture an action or decision, Enter adds an action">
-        <button class="btn small" data-act="cap-action">Add action</button>
-        <button class="btn small" data-act="cap-decision">Add decision</button>
-      </div>
-    </section>
-    <aside>
-      <section class="block"><h2>Questions to cover</h2>
-        ${m.questions.length ? m.questions.map((q, i) => `<label class="check ${q.asked ? "done" : ""}"><input type="checkbox" ${q.asked ? "checked" : ""} data-list="questions" data-i="${i}" data-k="asked"><span>${esc(q.text) || "Untitled question"}</span></label>`).join("") : `<p class="empty" style="padding:0">No questions prepped.</p>`}
-      </section>
-      <section class="block"><h2>Captured so far</h2>
-        ${m.actions.filter(a => (a.text || "").trim()).map(a => `<div class="mini">Action: ${esc(a.text)}</div>`).join("")}
-        ${(m.decisions || "").split("\n").filter(l => l.trim()).map(l => `<div class="mini">Decision: ${esc(l.replace(/^-\s*/, ""))}</div>`).join("") || (m.actions.some(a => (a.text || "").trim()) ? "" : `<p class="empty" style="padding:0">Nothing captured yet.</p>`)}
-      </section>
-    </aside>
-  </div>
-  <div class="foot-actions"><button class="btn" data-act="step" data-step="prep">Back to prep</button><button class="btn primary" data-act="end">End meeting and follow up</button></div>`;
-}
-
-function renderFollow(m) {
-  const t = todayISO();
-  return `
-  <section class="block"><h2>Outcome</h2>
-    <div class="fields" style="margin-bottom:12px">
-      <label class="f">Status<select class="in" data-f="status">${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}" ${k === m.status ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-    </div>
-    ${area("outcome", m.outcome, "What happened, in a sentence or two")}
-  </section>
-  <section class="block"><h2>Decisions</h2>
-    ${area("decisions", m.decisions, "One per line")}
-  </section>
-  <section class="block"><h2>Actions</h2>
-    <div class="rows">${m.actions.map((a, i) => `<div class="r ac ${a.done ? "done" : ""}">
-      <input type="checkbox" ${a.done ? "checked" : ""} data-list="actions" data-i="${i}" data-k="done" aria-label="Done">
-      ${li("actions", i, "text", a.text, "text", "Action", "txt")}${li("actions", i, "owner", a.owner, "text", "Owner")}
-      <input class="in ${a.due && a.due < t && !a.done ? "overdue" : ""}" type="date" data-list="actions" data-i="${i}" data-k="due" value="${esc(a.due)}" aria-label="Due date">${rm("actions", i)}</div>`).join("")}</div>
-    <button class="btn small adder" data-act="add" data-list="actions">Add action</button>
-  </section>
-  <section class="block"><h2>Next meeting</h2>
-    <div class="fields"><label class="f">Date${input("nextDate", m.nextDate, "date")}</label></div>
-    <button class="btn small adder" data-act="follow-on">Create follow-up meeting</button>
-  </section>
-  <div class="foot-actions">
-    <button class="btn danger" data-act="delete">Delete meeting</button>
-    <button class="btn primary" data-act="recap">Copy recap</button>
+function viewWelcome() {
+  return `<div class="welcome card pad">
+    <h1>Set up your first meeting</h1>
+    <p class="muted">Each recurring meeting gets its own tab. Its agenda, to-dos and issues carry over from one week to the next, and every meeting you end is saved to its archive.</p>
+    <div class="adder"><input class="in" id="w-name" data-ui="newName" value="${esc(ui.newName)}" placeholder="Meeting name, e.g. SLT weekly" data-enter="create-series"><button class="btn primary" data-act="create-series">Create meeting</button></div>
   </div>`;
 }
 
+function viewSeries(s) {
+  const lv = liveOf(s);
+  const tabs = [["meeting", "Meeting"], ["summary", "Summary"], ["archive", "Archive"], ["settings", "Settings"]];
+  const body = ui.tab === "summary" ? viewSummary(s) : ui.tab === "archive" ? viewArchive(s) : ui.tab === "settings" ? viewSettings(s) : viewMeeting(s);
+  return `<div class="shead">
+      <div class="stitle"><h1>${esc(s.name)}</h1><span class="muted">${esc(cadenceText(s))}</span>${lv ? `<span class="livepill">Meeting in progress</span>` : ""}</div>
+      <nav class="subtabs">${tabs.map(([k, l]) => `<button class="${ui.tab === k ? "on" : ""}" data-act="tab" data-tab="${k}">${l}</button>`).join("")}</nav>
+    </div>${body}`;
+}
 
-/* ---------- outstanding actions page ---------- */
-function outstanding() {
-  const acts = [];
-  all().forEach(m => m.actions.forEach((a, i) => { if (!a.done && (a.text || "").trim()) acts.push({ m, a, i }); }));
-  return acts;
+/* ----- meeting tab ----- */
+function viewMeeting(s) {
+  const lv = liveOf(s), items = s.agenda;
+  let idx = lv ? lv.sectionIdx : ui.section;
+  idx = Math.max(0, Math.min(idx || 0, items.length - 1));
+  let rec = null;
+  if (ui.panel) { rec = data[ui.panel.kind === "issue" ? "issues" : "todos"][ui.panel.id]; if (!rec || rec.seriesId !== s.id) { ui.panel = null; rec = null; } }
+  return `<div class="board ${rec ? "with-panel" : ""}">
+    <aside class="card agenda">${agendaCard(s, lv, idx)}</aside>
+    <div class="centre">${lastSummary(s)}${ui.centre === "notes" ? notesCard(s) : sectionCard(s, items[idx], lv)}</div>
+    ${rec ? `<button class="scrim" data-act="close-panel" aria-label="Close panel"></button><aside class="card panel">${ui.panel.kind === "issue" ? issuePanel(rec) : todoPanel(rec)}</aside>` : ""}
+  </div>`;
 }
-function actionGroups(acts) {
-  const t = todayISO(), wk = addDays(t, 7);
-  const byDue = (x, y) => (x.a.due || "").localeCompare(y.a.due || "") || (x.m.date || "").localeCompare(y.m.date || "");
-  return [
-    ["late", "Overdue", acts.filter(x => x.a.due && x.a.due < t).sort(byDue)],
-    ["week", "Due in the next 7 days", acts.filter(x => x.a.due && x.a.due >= t && x.a.due <= wk).sort(byDue)],
-    ["later", "Due later", acts.filter(x => x.a.due && x.a.due > wk).sort(byDue)],
-    ["none", "No due date", acts.filter(x => !x.a.due).sort(byDue)]
-  ].filter(g => g[2].length);
+
+function agendaCard(s, lv, idx) {
+  const items = s.agenda, total = items.reduce((n, it) => n + (Number(it.mins) || 0), 0);
+  const cur = lv ? items[lv.sectionIdx] : null, last = lv && lv.sectionIdx >= items.length - 1;
+  const top = lv ? `<div class="clock">
+      <div class="big" data-clock="total">00:00</div>
+      <div class="of">of ${total} minutes planned</div>
+      <div class="sec"><span>${esc(cur ? cur.title : "")}</span><b data-clock="section"></b></div>
+      <div class="ctl">${last ? "" : `<button class="btn" data-act="next">Next section</button>`}<button class="btn go" data-act="end">End meeting</button></div>
+    </div>` : `<div class="startwrap"><button class="btn primary block" data-act="start" ${items.length ? "" : "disabled"}>Start meeting</button></div>`;
+  return `<div class="ag-head"><h2>Agenda</h2><span class="muted small">${total} min</span></div>${top}
+    <ol class="ag-list">${items.map((it, i) => {
+      const live = lv && i === lv.sectionIdx;
+      return `<li><button class="ag-item ${i === idx && ui.centre === "section" ? "on" : ""} ${lv && i < lv.sectionIdx ? "past" : ""}" data-act="section" data-i="${i}">
+        <span>${esc(it.title) || "Untitled section"}</span><span class="mins">${Number(it.mins) || 0}m</span>${live ? `<i class="prog" data-clock="prog"></i>` : ""}</button></li>`;
+    }).join("")}</ol>
+    <button class="notes-btn ${ui.centre === "notes" ? "on" : ""}" data-act="notes">Meeting notes</button>
+    <button class="link edit" data-act="tab" data-tab="settings">Edit agenda</button>`;
 }
-function filteredOutstanding() {
-  const acts = outstanding();
-  if (!ownerFilter) return acts;
-  if (ownerFilter === "__none") return acts.filter(x => !(x.a.owner || "").trim());
-  return acts.filter(x => (x.a.owner || "").trim().toLowerCase() === ownerFilter.toLowerCase());
+
+function snapList(arr, empty, withDue) {
+  arr = toArr(arr);
+  if (!arr.length) return `<p class="muted small">${empty}</p>`;
+  return `<ul>${arr.map(x => `<li>${esc(x.text)}${x.owner || (withDue && x.due) ? ` <small>(${[x.owner, withDue && x.due ? "due " + fmtShort(x.due) : ""].filter(Boolean).map(esc).join(", ")})</small>` : ""}</li>`).join("")}</ul>`;
 }
-function renderActions() {
-  const everything = outstanding();
-  const owners = [...new Set(everything.map(x => (x.a.owner || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  if (ownerFilter && ownerFilter !== "__none" && !owners.some(o => o.toLowerCase() === ownerFilter.toLowerCase())) ownerFilter = "";
-  const acts = filteredOutstanding();
-  const head = `<button class="link back" data-act="back">Back to overview</button>
-    <div class="act-head">
-      <div><h1 style="font-size:30px">Outstanding actions</h1>
-      <p class="intro">${everything.length ? `${acts.length} open${ownerFilter ? " for this filter" : " across all meetings"}. Tick one off and it drops off this list.` : ""}</p></div>
-      ${everything.length ? `<div class="act-tools">
-        <select class="in" id="owner-filter" aria-label="Filter by owner">
-          <option value="">Everyone</option>
-          ${owners.map(o => `<option ${o.toLowerCase() === ownerFilter.toLowerCase() ? "selected" : ""}>${esc(o)}</option>`).join("")}
-          <option value="__none" ${ownerFilter === "__none" ? "selected" : ""}>No owner</option>
-        </select>
-        <button class="btn" data-act="copy-actions" ${acts.length ? "" : "disabled"}>Copy list</button>
-      </div>` : ""}
+function sessionBody(x) {
+  const sm = x.summary || {};
+  const mins = x.endedAt && x.startedAt ? Math.round((x.endedAt - x.startedAt) / 60000) : 0;
+  const notes = toArr(x.sectionNotes);
+  return `<div class="facts">
+      <span><b>${mins}</b>min</span>
+      <span><b>${x.rating != null ? x.rating : "–"}</b>${x.rating != null ? "/10 rating" : "no rating"}</span>
+      <span><b>${sm.todosDone || 0} of ${sm.todosTotal || 0}</b>to-dos done</span>
+      <span><b>${toArr(sm.solvedIssues).length}</b>issues solved</span>
+    </div>
+    <div class="sum-grid">
+      <div><h3>To-dos completed</h3>${snapList(sm.completedTodos, "None completed.")}</div>
+      <div><h3>Issues solved</h3>${snapList(sm.solvedIssues, "None solved.")}</div>
+      <div><h3>New to-dos</h3>${snapList(sm.newTodos, "No new to-dos.", true)}</div>
+    </div>
+    ${x.cascade ? `<div class="sum-block"><h3>Messages to share</h3><p class="prose">${esc(x.cascade)}</p></div>` : ""}
+    ${notes.map(n => `<div class="sum-block"><h3>${esc(n.title)}</h3><p class="prose">${esc(n.text)}</p></div>`).join("")}
+    ${x.notes ? `<div class="sum-block"><h3>Meeting notes</h3><p class="prose">${esc(x.notes)}</p></div>` : ""}`;
+}
+function lastSummary(s) {
+  const last = seriesSessions(s.id)[0];
+  if (!last) return `<div class="card pad"><h2>Last meeting's summary</h2><p class="muted small" style="margin:6px 0 0">Nothing yet. When you end a meeting, its summary appears here for the next one.</p></div>`;
+  return `<details class="card sum" ${ui.summaryOpen ? "open" : ""}>
+    <summary><h2>Last meeting's summary</h2><span class="muted small">${fmtDate(last.date)}</span><span class="chev" aria-hidden="true">▾</span></summary>
+    <div class="sum-body">${sessionBody(last)}</div></details>`;
+}
+
+function notesCard(s) {
+  return `<div class="card"><div class="lc-head"><h2>Meeting notes</h2></div>
+    <div style="padding:0 20px 20px"><textarea class="in notes" id="f-notes" data-bind="series/${s.id}/draft/notes" placeholder="Running notes for this meeting. They're saved into the meeting record when you end it.">${esc(s.draft.notes)}</textarea></div></div>`;
+}
+
+function sectionCard(s, it, lv) {
+  if (!it) return `<div class="card pad"><h2>No agenda yet</h2><p class="muted">Add sections to this meeting's agenda to get started.</p><button class="btn primary" data-act="tab" data-tab="settings">Edit agenda</button></div>`;
+  if (it.kind === "todos") return todosCard(s);
+  if (it.kind === "issues") return issuesCard(s, it);
+  if (it.kind === "wrapup") return wrapCard(s, it, lv);
+  const v = (s.draft.sectionNotes || {})[it.id] || "";
+  return `<div class="card"><div class="lc-head"><h2>${esc(it.title)}</h2></div>
+    <div style="padding:0 20px 20px"><textarea class="in tall" id="f-sec-${it.id}" data-bind="series/${s.id}/draft/sectionNotes/${it.id}" placeholder="Notes for this section, saved with the meeting record when you end it.">${esc(v)}</textarea></div></div>`;
+}
+
+function ownerOptions(s, selected, noneLabel) {
+  const names = [...s.members];
+  if (selected && !names.includes(selected)) names.push(selected);
+  return `<option value="">${noneLabel || "No owner"}</option>` + names.map(n => `<option ${n === selected ? "selected" : ""}>${esc(n)}</option>`).join("");
+}
+function defaultOwner(s, want) { return want && s.members.includes(want) ? want : (s.members[0] || ""); }
+
+function todoRow(t, showSeries) {
+  const sel = ui.panel && ui.panel.id === t.id;
+  const ser = data.series[t.seriesId];
+  return `<li class="${t.done ? "done" : ""} ${sel ? "sel" : ""}">
+    <button class="tick" data-act="toggle-todo" data-id="${t.id}" aria-label="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
+    ${avatar(t.owner)}
+    <button class="row-main" data-act="open" data-kind="todo" data-id="${t.id}">${esc(t.text) || "Untitled to-do"}</button>
+    ${showSeries ? `<button class="chip" data-act="goto" data-kind="todo" data-id="${t.id}">${esc(ser ? ser.name : "")}</button>` : ""}
+    <span class="due ${isLate(t) ? "late" : ""}">${fmtShort(t.due)}</span></li>`;
+}
+
+function todosCard(s) {
+  let list = seriesTodos(s.id);
+  const done = list.filter(t => t.done).length, pct = list.length ? Math.round(done / list.length * 100) : 0;
+  const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (a.createdAt || 0) - (b.createdAt || 0);
+  list.sort(ui.todoSort === "owner" ? (a, b) => (a.owner || "~").localeCompare(b.owner || "~") || byDue(a, b) : byDue);
+  const nt = ui.newTodo, owner = defaultOwner(s, nt.owner);
+  return `<div class="card">
+    <div class="lc-head"><h2>To-dos</h2><span class="pct">${pct}% completed</span><span class="grow"></span>
+      <label class="sortl">Sort by <select data-ui="todoSort" data-rerender="1"><option value="due" ${ui.todoSort === "due" ? "selected" : ""}>Due date</option><option value="owner" ${ui.todoSort === "owner" ? "selected" : ""}>Owner, A to Z</option></select></label></div>
+    <div class="adder-row">
+      <select class="in owner" id="nt-owner" data-ui="newTodo.owner" aria-label="Owner">${ownerOptions(s, owner)}</select>
+      <input class="in grow" id="nt-text" data-ui="newTodo.text" data-enter="add-todo" value="${esc(nt.text)}" placeholder="New to-do, press Enter to add">
+      <input class="in date" type="date" id="nt-due" data-ui="newTodo.due" value="${esc(nt.due || addDays(todayISO(), 7))}" aria-label="Due date">
+    </div>
+    ${list.length ? `<ul class="rows">${list.map(t => todoRow(t)).join("")}</ul>` : `<p class="empty">No open to-dos. Add one above, or turn an issue into a to-do.</p>`}
+    ${done ? `<p class="muted small" style="padding:0 20px 14px;margin:0">Ticked to-dos move to the archive when you end the meeting.</p>` : ""}
+  </div>`;
+}
+
+function issuesCard(s, it) {
+  const all = seriesIssues(s.id);
+  const short = all.filter(i => !i.longTerm), long = all.filter(i => i.longTerm);
+  const list = (ui.issueView === "long" ? long : short).sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0) || (a.createdAt || 0) - (b.createdAt || 0));
+  const ni = ui.newIssue, owner = defaultOwner(s, ni.owner);
+  return `<div class="card">
+    <div class="lc-head"><h2>${esc(it.title)}</h2><span class="grow"></span>
+      <div class="seg"><button class="${ui.issueView !== "long" ? "on" : ""}" data-act="issue-view" data-v="short">Short-term (${short.length})</button><button class="${ui.issueView === "long" ? "on" : ""}" data-act="issue-view" data-v="long">Long-term (${long.length})</button></div></div>
+    <div class="adder-row">
+      <select class="in owner" id="ni-owner" data-ui="newIssue.owner" aria-label="Owner">${ownerOptions(s, owner)}</select>
+      <input class="in grow" id="ni-text" data-ui="newIssue.text" data-enter="add-issue" value="${esc(ni.text)}" placeholder="New issue, press Enter to add">
+    </div>
+    ${list.length ? `<ul class="rows wide">${list.map(i => `<li class="${i.solved ? "done" : ""} ${ui.panel && ui.panel.id === i.id ? "sel" : ""}">
+        <button class="tick" data-act="solve" data-id="${i.id}" aria-label="${i.solved ? "Reopen issue" : "Mark solved"}">${i.solved ? "✓" : ""}</button>
+        ${avatar(i.owner)}
+        <button class="row-main" data-act="open" data-kind="issue" data-id="${i.id}">${esc(i.title) || "Untitled issue"}</button>
+        <button class="star ${i.star ? "on" : ""}" data-act="star" data-id="${i.id}" aria-label="${i.star ? "Remove priority" : "Mark as priority"}" title="Priority">★</button>
+        <span class="due">${fmtStamp(i.createdAt)}</span></li>`).join("")}</ul>`
+      : `<p class="empty">${ui.issueView === "long" ? "No long-term issues. Tick Long-term issue on any issue to park it here." : "No issues to discuss. Add one above."}</p>`}
+    ${all.some(i => i.solved) ? `<p class="muted small" style="padding:0 20px 14px;margin:0">Solved issues move to the archive when you end the meeting.</p>` : ""}
+  </div>`;
+}
+
+function wrapCard(s, it, lv) {
+  if (!lv) return `<div class="card pad"><h2>${esc(it.title)}</h2><p class="muted">During a live meeting this is where you recap new to-dos and solved issues, note anything to share with the wider team, and rate the meeting.</p></div>`;
+  const since = lv.startedAt;
+  const newTodos = seriesTodos(s.id).filter(t => (t.createdAt || 0) >= since);
+  const solved = seriesIssues(s.id).filter(i => i.solved);
+  const ratings = s.draft.ratings || {};
+  return `<div class="card pad stack">
+    <h2>${esc(it.title)}</h2>
+    <div class="sum-grid">
+      <div><h3>New to-dos (${newTodos.length})</h3>${snapList(newTodos.map(t => ({ text: t.text, owner: t.owner, due: t.due })), "No new to-dos this meeting.", true)}</div>
+      <div><h3>Issues solved (${solved.length})</h3>${snapList(solved.map(i => ({ text: i.title, owner: i.owner })), "No issues solved yet.")}</div>
+    </div>
+    <label class="f">Messages to share with the wider team<textarea class="in" id="f-cascade" data-bind="series/${s.id}/draft/cascade" placeholder="Anything agreed here that others need to hear about">${esc(s.draft.cascade)}</textarea></label>
+    <div><h3>Rate this meeting out of 10</h3>
+      ${s.members.length ? `<div class="ratings">${s.members.map(m => `<label class="rate">${avatar(m)}<span>${esc(m)}</span><select class="in" data-bind="series/${s.id}/draft/ratings/${fbKey(m)}" aria-label="Rating from ${esc(m)}"><option value="">–</option>${[1,2,3,4,5,6,7,8,9,10].map(n => `<option ${Number(ratings[fbKey(m)]) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>`).join("")}</div>`
+        : `<p class="muted small">Add people in Settings to collect ratings.</p>`}
+    </div>
+    <div><button class="btn primary" data-act="end">End meeting and save summary</button></div>
+  </div>`;
+}
+
+/* ----- side panels ----- */
+function seriesOptions(selected) { return seriesList().map(x => `<option value="${x.id}" ${x.id === selected ? "selected" : ""}>${esc(x.name)}</option>`).join(""); }
+function issuePanel(i) {
+  const s = data.series[i.seriesId];
+  return `<div class="p-head"><h2>Edit issue</h2><div class="p-tools"><button class="btn small" data-act="issue-todo" data-id="${i.id}">Make to-do</button><button class="x" data-act="close-panel" aria-label="Close">×</button></div></div>
+    <div class="p-timer">
+      <div class="timer" aria-label="Discussion timer">
+        <button data-act="it-minus" aria-label="One minute less">−</button><b data-clock="issue">${fmtClock(itimer.left)}</b><button data-act="it-plus" aria-label="One minute more">+</button>
+        <span class="div"></span><button data-act="it-play" aria-label="${itimer.running ? "Pause timer" : "Start timer"}">${itimer.running ? "❚❚" : "▶"}</button><button data-act="it-reset" aria-label="Reset timer">↺</button>
+      </div>
+      <button class="btn ${i.solved ? "" : "primary"}" data-act="solve" data-id="${i.id}">${i.solved ? "Reopen" : "Solve"}</button>
+    </div>
+    <label class="f"><span class="lab"><span>Issue</span><small>Created ${fmtStamp(i.createdAt)}</small></span><textarea class="in" rows="2" style="min-height:64px" id="p-title" data-bind="issues/${i.id}/title">${esc(i.title)}</textarea></label>
+    <label class="f">Details<textarea class="in tall" id="p-details" data-bind="issues/${i.id}/details" placeholder="Background, options, what a good outcome looks like">${esc(i.details)}</textarea></label>
+    <label class="f">Owner<select class="in" data-bind="issues/${i.id}/owner">${ownerOptions(s, i.owner)}</select></label>
+    <label class="f">Attach to meeting<select class="in" data-bind="issues/${i.id}/seriesId">${seriesOptions(i.seriesId)}</select></label>
+    <label class="chk"><input type="checkbox" data-bind="issues/${i.id}/longTerm" ${i.longTerm ? "checked" : ""}> Long-term issue</label>
+    <div class="p-foot"><button class="btn small danger" data-act="delete-rec" data-kind="issue" data-id="${i.id}">Delete issue</button><span class="muted small">Changes save as you type</span></div>`;
+}
+function todoPanel(t) {
+  const s = data.series[t.seriesId];
+  return `<div class="p-head"><h2>Edit to-do</h2><div class="p-tools"><button class="x" data-act="close-panel" aria-label="Close">×</button></div></div>
+    <label class="chk"><input type="checkbox" data-bind="todos/${t.id}/done" ${t.done ? "checked" : ""}> Done</label>
+    <label class="f"><span class="lab"><span>To-do</span><small>Created ${fmtStamp(t.createdAt)}</small></span><textarea class="in" rows="2" style="min-height:64px" id="p-title" data-bind="todos/${t.id}/text">${esc(t.text)}</textarea></label>
+    <label class="f">Details<textarea class="in tall" id="p-details" data-bind="todos/${t.id}/details" placeholder="Anything the owner needs to know">${esc(t.details)}</textarea></label>
+    <div class="two">
+      <label class="f">Owner<select class="in" data-bind="todos/${t.id}/owner">${ownerOptions(s, t.owner)}</select></label>
+      <label class="f">Due date<input class="in" type="date" data-bind="todos/${t.id}/due" value="${esc(t.due)}"></label>
+    </div>
+    <label class="f">Attach to meeting<select class="in" data-bind="todos/${t.id}/seriesId">${seriesOptions(t.seriesId)}</select></label>
+    <div class="p-foot"><button class="btn small danger" data-act="delete-rec" data-kind="todo" data-id="${t.id}">Delete to-do</button><span class="muted small">Changes save as you type</span></div>`;
+}
+
+/* ----- summary tab ----- */
+function viewSummary(s) {
+  const todos = seriesTodos(s.id), open = todos.filter(t => !t.done), late = open.filter(isLate);
+  const issues = seriesIssues(s.id).filter(i => !i.solved);
+  const sess = seriesSessions(s.id), recent = sess.slice(0, 8);
+  const rated = sess.slice(0, 5).filter(x => x.rating != null);
+  const avg = rated.length ? (rated.reduce((n, x) => n + Number(x.rating), 0) / rated.length).toFixed(1) : "–";
+  const owners = {};
+  open.forEach(t => { const k = t.owner || "No owner"; owners[k] = owners[k] || { open: 0, late: 0 }; owners[k].open++; if (isLate(t)) owners[k].late++; });
+  const longs = issues.filter(i => i.longTerm);
+  return `<div class="card pad" style="margin-bottom:18px"><div class="facts" style="padding:0">
+      <span><b>${open.length}</b>open to-dos</span><span><b class="${late.length ? "due late" : ""}">${late.length}</b>overdue</span>
+      <span><b>${issues.filter(i => !i.longTerm).length}</b>short-term issues</span><span><b>${longs.length}</b>long-term issues</span>
+      <span><b>${avg}</b>average rating, last five meetings</span><span><b>${sess.length}</b>meetings held</span></div></div>
+    <div class="cols">
+      <div class="card"><div class="lc-head"><h2>Open to-dos by owner</h2></div>
+        ${Object.keys(owners).length ? `<div style="padding:0 20px 16px"><table class="t"><thead><tr><th>Owner</th><th class="num">Open</th><th class="num">Overdue</th></tr></thead><tbody>
+          ${Object.entries(owners).sort((a, b) => a[0].localeCompare(b[0])).map(([n, c]) => `<tr><td>${esc(n)}</td><td class="num">${c.open}</td><td class="num ${c.late ? "due late" : ""}">${c.late}</td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No open to-dos.</p>`}</div>
+      <div class="card"><div class="lc-head"><h2>Recent meetings</h2></div>
+        ${recent.length ? `<div style="padding:0 20px 16px"><table class="t"><thead><tr><th>Date</th><th class="num">Minutes</th><th class="num">To-dos done</th><th class="num">Rating</th></tr></thead><tbody>
+          ${recent.map(x => { const sm = x.summary || {}; const p = sm.todosTotal ? Math.round(sm.todosDone / sm.todosTotal * 100) + "%" : "–"; return `<tr><td><button class="link" data-act="archive-open" data-id="${x.id}">${fmtDate(x.date)}</button></td><td class="num">${Math.round(((x.endedAt || 0) - (x.startedAt || 0)) / 60000)}</td><td class="num">${p}</td><td class="num">${x.rating != null ? x.rating : "–"}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="empty">No meetings ended yet.</p>`}</div>
+      <div class="card"><div class="lc-head"><h2>Long-term issues</h2></div>
+        ${longs.length ? `<ul class="rows">${longs.map(i => `<li style="grid-template-columns:auto minmax(0,1fr) auto">${avatar(i.owner)}<button class="row-main" data-act="goto" data-kind="issue" data-id="${i.id}">${esc(i.title) || "Untitled issue"}</button><span class="due">${fmtStamp(i.createdAt)}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing parked as long-term.</p>`}</div>
     </div>`;
-  if (!everything.length) return head + `<div class="card" style="margin-top:22px"><p class="empty" style="padding:0">No outstanding actions. Actions added in a meeting's Run or Follow up step appear here until they're ticked off.</p></div>`;
-  if (!acts.length) return head + `<div class="card" style="margin-top:22px"><p class="empty" style="padding:0">Nothing outstanding for this owner. Choose Everyone to see the full list.</p></div>`;
-  const t = todayISO();
-  return head + actionGroups(acts).map(([cls, label, list]) => `
-    <div class="group ${cls}"><div class="card"><h2>${label} <small>${list.length}</small></h2>
-      ${list.map(({ m, a, i }) => `<div class="act-row">
-        <input type="checkbox" aria-label="Mark done" data-mid="${m.id}" data-list="actions" data-i="${i}" data-k="done">
-        <div><div class="txt">${esc(a.text)}</div>
-        <div class="meta">${a.owner ? esc(a.owner) : "No owner"}${a.due ? `, <span class="${a.due < t ? "overdue" : ""}">due ${fmtDate(a.due, { weekday: "short", day: "numeric", month: "short" })}</span>` : ""}.
-        From <button class="link" data-act="open" data-id="${m.id}" data-step="follow">${esc(m.title) || "Untitled meeting"}</button>, ${fmtDate(m.date, { day: "numeric", month: "short" })}</div></div>
-      </div>`).join("")}
-    </div></div>`).join("");
-}
-function actionsText() {
-  const lines = ["Outstanding actions", ""];
-  actionGroups(filteredOutstanding()).forEach(([, label, list]) => {
-    lines.push(label);
-    list.forEach(({ m, a }) => lines.push(`- ${a.text}${a.owner ? ` (${a.owner}` : " ("}${a.due ? `${a.owner ? ", " : ""}due ${fmtDate(a.due, { day: "numeric", month: "short" })}` : a.owner ? "" : "no owner"}) [${m.title || "Untitled meeting"}]`));
-    lines.push("");
-  });
-  return lines.join("\n").trim();
 }
 
-/* ---------- timer ---------- */
-let timer = { mid: null, running: false, base: 0, since: 0, idx: 0, itemStart: 0 }, tickId = null;
-const elapsedSec = () => (timer.base + (timer.running ? Date.now() - timer.since : 0)) / 1000;
-const mmss = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600); return (h ? h + ":" + pad(Math.floor(s / 60) % 60) : pad(Math.floor(s / 60))) + ":" + pad(s % 60); };
-function ensureTimer(m) {
-  if (timer.mid === m.id) return;
-  clearInterval(tickId); tickId = null;
-  const first = m.agenda.findIndex(a => !a.done);
-  timer = { mid: m.id, running: false, base: 0, since: 0, idx: first < 0 ? m.agenda.length : first, itemStart: 0 };
-}
-function updateTimerUI() {
-  const m = current(); if (!m || step !== "run" || !$("t-elapsed")) return;
-  const e = elapsedSec(), planned = agendaMins(m) || m.duration || 0;
-  $("t-elapsed").textContent = mmss(e);
-  $("t-clock").classList.toggle("over", planned > 0 && e > planned * 60);
-  if ($("t-head")) $("t-head").style.left = `calc(${Math.min(e / ((agendaMins(m) || 1) * 60), 1) * 100}% - 1px)`;
-  document.querySelectorAll("[data-seg]").forEach(s => {
-    const i = +s.dataset.seg; s.classList.toggle("done", !!(m.agenda[i] && m.agenda[i].done)); s.classList.toggle("current", i === timer.idx);
-  });
-  const item = m.agenda[timer.idx];
-  const left = $("t-left");
-  if (!m.agenda.length) { $("t-item").textContent = "No agenda set"; left.textContent = ""; }
-  else if (!item) { $("t-item").textContent = "Agenda complete"; left.textContent = ""; }
-  else {
-    $("t-item").textContent = item.topic || `Item ${timer.idx + 1}`;
-    const rem = (Number(item.mins) || 0) * 60 - (e - timer.itemStart);
-    left.textContent = rem >= 0 ? `${mmss(rem)} left` : `${mmss(-rem)} over`;
-    left.classList.toggle("over", rem < 0);
-  }
-  $("t-toggle").textContent = timer.running ? "Pause" : e > 0 ? "Resume" : "Start";
+/* ----- archive tab ----- */
+function viewArchive(s) {
+  const sess = seriesSessions(s.id);
+  const doneTodos = Object.values(data.todos).filter(t => t.seriesId === s.id && t.archived).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0)).slice(0, 60);
+  const solved = Object.values(data.issues).filter(i => i.seriesId === s.id && i.archived).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0)).slice(0, 60);
+  return `<div class="stack">
+    <div class="card"><div class="lc-head"><h2>Past meetings</h2><span class="muted small">${sess.length}</span></div>
+      ${sess.length ? sess.map(x => `<details class="arch" id="arch-${x.id}" ${ui.archOpen === x.id ? "open" : ""}><summary><b>${fmtDate(x.date)}</b><span class="muted small">${Math.round(((x.endedAt || 0) - (x.startedAt || 0)) / 60000)} min${x.rating != null ? `, rated ${x.rating}/10` : ""}</span></summary>
+        <div class="sum-body">${sessionBody(x)}<div class="sum-block"><button class="btn small danger" data-act="delete-session" data-id="${x.id}">Delete this record</button></div></div></details>`).join("")
+        : `<p class="empty">Ended meetings are saved here with their notes, ratings and what got done.</p>`}</div>
+    <div class="cols">
+      <div class="card"><div class="lc-head"><h2>Completed to-dos</h2></div>
+        ${doneTodos.length ? `<ul class="rows">${doneTodos.map(t => `<li style="grid-template-columns:auto minmax(0,1fr) auto auto">${avatar(t.owner)}<span>${esc(t.text)}</span><span class="due">${fmtStamp(t.archivedAt)}</span><button class="link" data-act="restore" data-kind="todo" data-id="${t.id}">Restore</button></li>`).join("")}</ul>` : `<p class="empty">None yet.</p>`}</div>
+      <div class="card"><div class="lc-head"><h2>Solved issues</h2></div>
+        ${solved.length ? `<ul class="rows">${solved.map(i => `<li style="grid-template-columns:auto minmax(0,1fr) auto auto">${avatar(i.owner)}<span>${esc(i.title)}</span><span class="due">${fmtStamp(i.archivedAt)}</span><button class="link" data-act="restore" data-kind="issue" data-id="${i.id}">Restore</button></li>`).join("")}</ul>` : `<p class="empty">None yet.</p>`}</div>
+    </div></div>`;
 }
 
-/* ---------- events ---------- */
-document.addEventListener("input", e => {
-  const el = e.target;
-  if (el.id === "search") { query = el.value; renderList(); return; }
-  if (el.id === "owner-filter") { ownerFilter = el.value; renderMain(); return; }
-  const m = el.dataset.mid ? meetings[el.dataset.mid] : current();
-  if (!m) return;
-  const val = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? "" : Number(el.value)) : el.value;
-  if (el.dataset.f) {
-    m[el.dataset.f] = val;
-    if (["title", "team", "date", "time", "duration", "type", "location", "status"].includes(el.dataset.f)) { renderList(); updateHeader(); }
-    if (el.dataset.f === "duration") updateAgendaTotal();
-  } else if (el.dataset.list) {
-    const item = m[el.dataset.list][+el.dataset.i]; if (!item) return;
-    item[el.dataset.k] = val;
-    if (el.dataset.list === "agenda") updateAgendaTotal();
-    if (el.type === "checkbox") {
-      if (el.dataset.mid) { scheduleSave(m); setTimeout(() => { renderList(); renderMain(); }, 250); return; }
-      const row = el.closest(".r, .check"); if (row) row.classList.toggle("done", el.checked);
-      if (el.dataset.list === "actions") renderList();
+/* ----- settings tab ----- */
+function viewSettings(s) {
+  const total = s.agenda.reduce((n, it) => n + (Number(it.mins) || 0), 0);
+  return `<div class="cols">
+    <div class="card pad stack">
+      <h2>Meeting details</h2>
+      <label class="f">Name<input class="in" id="s-name" data-bind="series/${s.id}/name" value="${esc(s.name)}"></label>
+      <div class="form-grid">
+        <label class="f">How often<select class="in" data-bind="series/${s.id}/cadence">${CADENCES.map(c => `<option ${c === s.cadence ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+        <label class="f">Day<select class="in" data-bind="series/${s.id}/day">${DAYS.map(d => `<option ${d === s.day ? "selected" : ""}>${d}</option>`).join("")}</select></label>
+        <label class="f">Time<input class="in" type="time" id="s-time" data-bind="series/${s.id}/time" value="${esc(s.time)}"></label>
+      </div>
+      <div><h3>People</h3>
+        <div class="member-list">${s.members.map((m, i) => `<span class="member">${avatar(m)}${esc(m)}<button class="x" data-act="remove-member" data-i="${i}" aria-label="Remove ${esc(m)}">×</button></span>`).join("") || `<span class="muted small">No one added yet. People here appear in the owner lists and ratings.</span>`}</div>
+        <div style="display:flex;gap:8px"><input class="in" id="s-member" data-ui="newMember" data-enter="add-member" value="${esc(ui.newMember)}" placeholder="Full name"><button class="btn" data-act="add-member">Add person</button></div>
+      </div>
+      <div class="p-foot" style="margin-top:6px"><button class="btn small danger" data-act="delete-series">Delete this meeting</button><span class="muted small">Changes save as you type</span></div>
+    </div>
+    <div class="card pad stack">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2>Agenda</h2><span class="muted small">${total} min in total</span></div>
+      <p class="muted small" style="margin:0">The section type decides what shows in the middle of the meeting page: a notes box, the to-do list, the issues list, or the wrap-up.</p>
+      <ol class="ag-edit">${s.agenda.map((it, i) => `<li>
+        <input class="in" id="ag-t-${it.id}" data-bind="series/${s.id}/agenda/${i}/title" value="${esc(it.title)}" aria-label="Section name" placeholder="Section name">
+        <input class="in" type="number" min="0" id="ag-m-${it.id}" data-bind="series/${s.id}/agenda/${i}/mins" value="${Number(it.mins) || 0}" aria-label="Minutes">
+        <select class="in" data-bind="series/${s.id}/agenda/${i}/kind" aria-label="Section type">${Object.entries(KINDS).map(([k, l]) => `<option value="${k}" ${k === it.kind ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <button class="x" data-act="ag-move" data-i="${i}" data-d="-1" aria-label="Move up" ${i ? "" : "disabled"}>↑</button>
+        <button class="x" data-act="ag-move" data-i="${i}" data-d="1" aria-label="Move down" ${i < s.agenda.length - 1 ? "" : "disabled"}>↓</button>
+        <button class="x" data-act="ag-remove" data-i="${i}" aria-label="Remove section">×</button></li>`).join("")}</ol>
+      <div><button class="btn" data-act="ag-add">Add section</button></div>
+    </div></div>`;
+}
+
+/* ----- all to-dos view ----- */
+function viewAllTodos() {
+  let list = Object.values(data.todos).filter(t => !t.archived && data.series[t.seriesId]);
+  const owners = [...new Set(list.map(t => t.owner).filter(Boolean))].sort();
+  if (ui.ownerFilter) list = list.filter(t => t.owner === ui.ownerFilter);
+  const t0 = todayISO(), wk = addDays(t0, 7);
+  const byDue = (a, b) => (a.due || "9999").localeCompare(b.due || "9999");
+  const groups = [
+    ["Overdue", list.filter(isLate)],
+    ["Due in the next 7 days", list.filter(t => !isLate(t) && t.due && t.due <= wk)],
+    ["Later", list.filter(t => !isLate(t) && t.due && t.due > wk)],
+    ["No due date", list.filter(t => !t.due)]
+  ];
+  return `<div class="shead"><div class="stitle"><h1>All to-dos</h1><span class="muted">${list.filter(t => !t.done).length} open across every meeting</span></div>
+      <label class="sortl">Owner <select class="in" style="width:auto" data-ui="ownerFilter" data-rerender="1"><option value="">Everyone</option>${owners.map(o => `<option ${o === ui.ownerFilter ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label></div>
+    <div class="stack">${groups.filter(g => g[1].length).map(([n, g]) => `<div class="card"><div class="lc-head"><h2 class="${n === "Overdue" ? "due late" : ""}" style="font-size:18px">${n}</h2><span class="muted small">${g.length}</span></div><ul class="rows wide">${g.sort(byDue).map(t => todoRow(t, true)).join("")}</ul></div>`).join("")
+      || `<div class="card"><p class="empty">No to-dos. Add them from a meeting's To-dos section.</p></div>`}</div>`;
+}
+
+/* ---------- clocks ---------- */
+function tick() {
+  const s = cur(), lv = liveOf(s);
+  if (lv && ui.view === "series") {
+    const total = s.agenda.reduce((n, it) => n + (Number(it.mins) || 0), 0) * 60;
+    const el = (now() - lv.startedAt) / 1000;
+    const t = document.querySelector('[data-clock="total"]');
+    if (t) { t.textContent = fmtClock(el); t.classList.toggle("over", el > total); }
+    const it = s.agenda[lv.sectionIdx];
+    if (it) {
+      const alloc = (Number(it.mins) || 0) * 60, used = (now() - lv.sectionStartedAt) / 1000, left = alloc - used;
+      const sec = document.querySelector('[data-clock="section"]');
+      if (sec) { sec.textContent = left >= 0 ? `${fmtClock(left)} left` : `${fmtClock(-left)} over`; sec.classList.toggle("over", left < 0); }
+      const p = document.querySelector('[data-clock="prog"]');
+      if (p) { p.style.width = (alloc ? Math.min(100, used / alloc * 100) : 100) + "%"; p.classList.toggle("over", left < 0); }
     }
-  } else return;
-  scheduleSave(m);
-});
-
-function updateAgendaTotal() {
-  const m = current(), el = $("ag-total"); if (!m || !el) return;
-  const total = agendaMins(m), over = m.duration && total > m.duration;
-  el.className = "total" + (over ? " warn" : "");
-  el.textContent = m.agenda.length ? `Agenda totals ${total} of ${m.duration || 0} minutes${over ? ". Trim something or extend the meeting." : "."}` : "Add agenda items to use the timer in Run.";
+  }
+  if (itimer.running) { itimer.left = Math.max(0, (itimer.endsAt - Date.now()) / 1000); if (!itimer.left) { itimer.running = false; const b = document.querySelector('[data-act="it-play"]'); if (b) { b.textContent = "▶"; b.setAttribute("aria-label", "Start timer"); } } }
+  const ic = document.querySelector('[data-clock="issue"]');
+  if (ic) { ic.textContent = fmtClock(Math.ceil(itimer.left)); ic.classList.toggle("done", itimer.left <= 0); }
 }
+setInterval(tick, 1000);
 
-function openMeeting(id, s) { flushAll(); view = "meetings"; currentId = id; step = s || "prep"; renderList(); renderMain(); window.scrollTo(0, 0); }
-function createMeeting(extra) { const m = blank(extra); meetings[m.id] = m; store.save(m); openMeeting(m.id, "prep"); setTimeout(() => { const f = document.querySelector('[data-f="title"]'); if (f && !m.title) f.focus(); }, 0); }
-
-function capture(kind) {
-  const m = current(), el = $("cap"); if (!m || !el || !el.value.trim()) return;
-  const text = el.value.trim();
-  if (kind === "action") m.actions.push({ text, owner: "", due: "", done: false });
-  else m.decisions = (m.decisions ? m.decisions.replace(/\s+$/, "") + "\n" : "") + "- " + text;
-  scheduleSave(m);
-  const notes = document.querySelector('[data-f="notes"]'); const pos = notes ? notes.scrollTop : 0;
-  renderMain();
-  const n2 = document.querySelector('[data-f="notes"]'); if (n2) n2.scrollTop = pos;
-  $("cap").focus();
-  toast(kind === "action" ? "Action added" : "Decision added");
+/* ---------- actions ---------- */
+function defaultAgenda() {
+  return [
+    { id: uid(), title: "News and updates", mins: 5, kind: "notes" },
+    { id: uid(), title: "To-dos", mins: 5, kind: "todos" },
+    { id: uid(), title: "Discussion points", mins: 60, kind: "issues" },
+    { id: uid(), title: "Wrap-up", mins: 5, kind: "wrapup" }
+  ];
 }
-
-function recapText(m) {
-  const lines = [`Meeting recap: ${m.title || "Untitled meeting"}${m.team ? " (" + m.team + ")" : ""}`, fmtDate(m.date), ""];
-  const people = m.attendees.filter(a => a.name).map(a => a.name + (a.role ? ` (${a.role})` : ""));
-  if (people.length) lines.push("Attendees: " + people.join(", "), "");
-  if (m.outcome.trim()) lines.push("Summary", m.outcome.trim(), "");
-  const dec = m.decisions.split("\n").map(l => l.replace(/^-\s*/, "").trim()).filter(Boolean);
-  if (dec.length) lines.push("Decisions", ...dec.map(d => "- " + d), "");
-  const acts = m.actions.filter(a => (a.text || "").trim());
-  if (acts.length) lines.push("Actions", ...acts.map(a => `- ${a.text}${a.owner ? ` (${a.owner}` : ""}${a.due ? `${a.owner ? ", " : " ("}by ${fmtDate(a.due, { day: "numeric", month: "short" })}` : ""}${a.owner || a.due ? ")" : ""}${a.done ? " [done]" : ""}`), "");
-  if (m.nextDate) lines.push(`Next meeting: ${fmtDate(m.nextDate)}`);
-  return lines.join("\n").trim();
+function createSeries(name) {
+  const id = uid();
+  write(["series", id], { id, name: name || "New meeting", cadence: "Weekly", day: "Monday", time: "10:00", members: [], agenda: defaultAgenda(), createdAt: Date.now() }, 0);
+  data.series[id] = normSeries(data.series[id], id);
+  Object.assign(ui, { seriesId: id, view: "series", tab: "settings", section: 0, centre: "section", panel: null, newName: "" });
+  render();
+  const n = $("s-name"); if (n) { n.focus(); n.select(); }
 }
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); }
-  catch (e) { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+function openPanel(kind, id) {
+  ui.panel = { kind, id };
+  if (kind === "issue" && itimer.id !== id) Object.assign(itimer, { id, total: 300, left: 300, running: false });
 }
-
-document.addEventListener("keydown", e => { if (e.target.id === "cap" && e.key === "Enter") { e.preventDefault(); capture("action"); } });
+function startMeeting(s) {
+  const t = now();
+  write(["series", s.id, "live"], { sessionId: uid(), startedAt: t, sectionIdx: 0, sectionStartedAt: t }, 0);
+  ui.centre = "section"; ui.summaryOpen = false;
+  render(); toast("Meeting started");
+}
+function gotoSection(s, i) {
+  const lv = liveOf(s);
+  if (lv) { write(["series", s.id, "live", "sectionIdx"], i, 0); write(["series", s.id, "live", "sectionStartedAt"], now(), 0); lastLive = lv.sessionId + ":" + i; }
+  else ui.section = i;
+  ui.centre = "section"; render();
+}
+function endMeeting(s) {
+  const lv = liveOf(s); if (!lv) return;
+  if (!confirm("End the meeting? Ticked to-dos and solved issues move to the archive, and a summary is saved for next time.")) return;
+  const t = now(), d = s.draft || {};
+  const todos = seriesTodos(s.id), done = todos.filter(x => x.done);
+  const solved = seriesIssues(s.id).filter(i => i.solved);
+  const newTodos = todos.filter(x => (x.createdAt || 0) >= lv.startedAt);
+  const ratings = {}; Object.entries(d.ratings || {}).forEach(([k, v]) => { if (v !== "" && v != null) ratings[k] = Number(v); });
+  const vals = Object.values(ratings);
+  const sess = {
+    id: lv.sessionId, seriesId: s.id, date: todayISO(), startedAt: lv.startedAt, endedAt: t,
+    attendees: s.members, notes: d.notes || "", cascade: d.cascade || "",
+    sectionNotes: s.agenda.map(it => ({ title: it.title, text: ((d.sectionNotes || {})[it.id] || "").trim() })).filter(x => x.text),
+    ratings, rating: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null,
+    summary: {
+      todosTotal: todos.length, todosDone: done.length,
+      completedTodos: done.map(x => ({ text: x.text || "", owner: x.owner || "" })),
+      solvedIssues: solved.map(i => ({ text: i.title || "", owner: i.owner || "" })),
+      newTodos: newTodos.map(x => ({ text: x.text || "", owner: x.owner || "", due: x.due || "" }))
+    }
+  };
+  write(["sessions", sess.id], sess, 0);
+  done.forEach(x => { write(["todos", x.id, "archived"], true, 0); write(["todos", x.id, "archivedAt"], t, 0); });
+  solved.forEach(i => { write(["issues", i.id, "archived"], true, 0); write(["issues", i.id, "archivedAt"], t, 0); });
+  write(["series", s.id, "draft"], null, 0);
+  write(["series", s.id, "live"], null, 0);
+  data.series[s.id].draft = {};
+  lastLive = "";
+  Object.assign(ui, { section: 0, centre: "section", panel: null, summaryOpen: true });
+  render(); toast("Meeting ended and summary saved");
+}
+function addTodo(s) {
+  const text = (ui.newTodo.text || "").trim();
+  if (!text) { const el = $("nt-text"); if (el) el.focus(); return; }
+  const id = uid(), lv = liveOf(s);
+  write(["todos", id], { id, seriesId: s.id, text, details: "", owner: defaultOwner(s, ui.newTodo.owner), due: ui.newTodo.due || addDays(todayISO(), 7), done: false, createdAt: now(), sessionId: lv ? lv.sessionId : null }, 0);
+  ui.newTodo.text = "";
+  render(); const el = $("nt-text"); if (el) el.focus();
+}
+function addIssue(s) {
+  const text = (ui.newIssue.text || "").trim();
+  if (!text) { const el = $("ni-text"); if (el) el.focus(); return; }
+  const id = uid();
+  write(["issues", id], { id, seriesId: s.id, title: text, details: "", owner: defaultOwner(s, ui.newIssue.owner), longTerm: ui.issueView === "long", solved: false, star: false, createdAt: now() }, 0);
+  ui.newIssue.text = "";
+  render(); const el = $("ni-text"); if (el) el.focus();
+}
 
 document.addEventListener("click", e => {
-  const b = e.target.closest("[data-act]"); if (!b) return;
-  const act = b.dataset.act, m = current();
+  const b = e.target.closest("[data-act]"); if (!b || b.disabled) return;
+  const act = b.dataset.act, id = b.dataset.id, s = cur();
   switch (act) {
-    case "new": createMeeting(); break;
-    case "open": openMeeting(b.dataset.id, b.dataset.step); break;
-    case "home":
-    case "back": flushAll(); currentId = null; view = "meetings"; renderList(); renderMain(); break;
-    case "actions-view": flushAll(); currentId = null; view = "actions"; renderList(); renderMain(); window.scrollTo(0, 0); break;
-    case "copy-actions": copy(actionsText()).then(() => toast("Action list copied")); break;
-    case "reload": renderMain(); break;
-    case "filter":
-      filter = b.dataset.filter;
-      document.querySelectorAll(".filters button").forEach(x => x.classList.toggle("on", x === b));
-      renderList(); break;
-    case "step": step = b.dataset.step; renderMain(); window.scrollTo(0, 0); break;
-    case "add": {
-      const defs = { attendees: { name: "", role: "" }, questions: { text: "", asked: false }, agenda: { topic: "", mins: 10, owner: "", done: false }, actions: { text: "", owner: "", due: "", done: false } };
-      m[b.dataset.list].push({ ...defs[b.dataset.list] }); scheduleSave(m); renderMain();
-      const rows = document.querySelectorAll(`[data-list="${b.dataset.list}"][data-i="${m[b.dataset.list].length - 1}"]`);
-      const first = [...rows].find(r => r.type !== "checkbox"); if (first) first.focus();
-      break;
+    case "home": ui.view = "series"; ui.tab = "meeting"; ui.panel = null; render(); break;
+    case "all-todos": ui.view = ui.view === "todos" ? "series" : "todos"; ui.panel = null; render(); break;
+    case "series":
+      if (ui.seriesId !== id || ui.view !== "series") Object.assign(ui, { seriesId: id, view: "series", tab: "meeting", section: 0, centre: "section", panel: null, newTodo: { text: "", owner: "", due: "" }, newIssue: { text: "", owner: "" } });
+      lastLive = (() => { const lv = liveOf(data.series[id]); return lv ? lv.sessionId + ":" + lv.sectionIdx : ""; })();
+      render(); break;
+    case "new-series": createSeries("New meeting"); break;
+    case "create-series": createSeries((ui.newName || "").trim()); break;
+    case "tab": ui.tab = b.dataset.tab; ui.panel = null; render(); break;
+    case "section": gotoSection(s, Number(b.dataset.i)); break;
+    case "notes": ui.centre = "notes"; render(); { const n = $("f-notes"); if (n) n.focus(); } break;
+    case "start": startMeeting(s); break;
+    case "next": { const lv = liveOf(s); if (lv) gotoSection(s, Math.min(lv.sectionIdx + 1, s.agenda.length - 1)); break; }
+    case "end": endMeeting(s); break;
+    case "add-todo": addTodo(s); break;
+    case "add-issue": addIssue(s); break;
+    case "toggle-todo": { const t = data.todos[id]; if (!t) break; write(["todos", id, "done"], !t.done, 0); write(["todos", id, "doneAt"], !t.done ? now() : null, 0); render(); break; }
+    case "solve": { const i = data.issues[id]; if (!i) break; write(["issues", id, "solved"], !i.solved, 0); write(["issues", id, "solvedAt"], !i.solved ? now() : null, 0); if (i.solved) itimer.running = false; render(); if (i.solved) toast("Issue solved"); break; }
+    case "star": { const i = data.issues[id]; if (i) { write(["issues", id, "star"], !i.star, 0); render(); } break; }
+    case "issue-view": ui.issueView = b.dataset.v; render(); break;
+    case "open": openPanel(b.dataset.kind, id); render(); { const f = $("p-title"); if (f && window.innerWidth > 780) f.focus(); } break;
+    case "goto": {
+      const rec = data[b.dataset.kind === "issue" ? "issues" : "todos"][id]; if (!rec) break;
+      Object.assign(ui, { seriesId: rec.seriesId, view: "series", tab: "meeting", centre: "section" });
+      const ser = data.series[rec.seriesId], want = b.dataset.kind === "issue" ? "issues" : "todos";
+      const idx = ser ? ser.agenda.findIndex(it => it.kind === want) : -1;
+      if (idx >= 0 && !liveOf(ser)) ui.section = idx;
+      if (b.dataset.kind === "issue") ui.issueView = rec.longTerm ? "long" : "short";
+      openPanel(b.dataset.kind, id); render(); break;
     }
-    case "remove": m[b.dataset.list].splice(+b.dataset.i, 1); scheduleSave(m); renderMain(); break;
-    case "t-toggle":
-      if (timer.running) { timer.base += Date.now() - timer.since; timer.running = false; clearInterval(tickId); tickId = null; }
-      else { timer.since = Date.now(); timer.running = true; tickId = setInterval(updateTimerUI, 500); }
-      updateTimerUI(); break;
-    case "t-next": {
-      const item = m.agenda[timer.idx];
-      if (item) { item.done = true; scheduleSave(m); }
-      timer.idx = Math.min(timer.idx + 1, m.agenda.length); timer.itemStart = elapsedSec();
-      updateTimerUI(); break;
+    case "close-panel": ui.panel = null; itimer.running = false; render(); break;
+    case "issue-todo": {
+      const i = data.issues[id]; if (!i) break;
+      const tid = uid(), lv = liveOf(data.series[i.seriesId]);
+      write(["todos", tid], { id: tid, seriesId: i.seriesId, text: i.title || "", details: i.details || "", owner: i.owner || "", due: addDays(todayISO(), 7), done: false, createdAt: now(), fromIssue: i.id, sessionId: lv ? lv.sessionId : null }, 0);
+      render(); toast("To-do added, due in 7 days"); break;
     }
-    case "t-reset":
-      clearInterval(tickId); tickId = null;
-      m.agenda.forEach(a => a.done = false); scheduleSave(m);
-      timer = { mid: m.id, running: false, base: 0, since: 0, idx: 0, itemStart: 0 };
-      updateTimerUI(); break;
-    case "cap-action": capture("action"); break;
-    case "cap-decision": capture("decision"); break;
-    case "end":
-      if (timer.running) { timer.base += Date.now() - timer.since; timer.running = false; clearInterval(tickId); tickId = null; }
-      if (m.status === "planned") { m.status = "held"; scheduleSave(m); renderList(); }
-      step = "follow"; renderMain(); window.scrollTo(0, 0); break;
-    case "recap": copy(recapText(m)).then(() => toast("Recap copied, paste it into your email")); break;
-    case "follow-on": {
-      const open = openActions(m).map(a => `- ${a.text}${a.owner ? ` (${a.owner})` : ""}`);
-      createMeeting({
-        team: m.team, type: "Follow-up", title: m.title ? m.title + " follow-up" : "Follow-up",
-        date: m.nextDate || addDays(todayISO(), 14), time: m.time, duration: m.duration, location: m.location,
-        attendees: m.attendees.map(a => ({ ...a })),
-        background: `Follows ${m.title || "meeting"} on ${fmtDate(m.date)}.${m.outcome ? "\n" + m.outcome : ""}${open.length ? "\n\nOpen actions:\n" + open.join("\n") : ""}`
-      });
-      toast("Follow-up meeting created"); break;
+    case "it-minus": itimer.left = Math.max(0, itimer.left - 60); if (itimer.running) itimer.endsAt -= 60000; tick(); break;
+    case "it-plus": itimer.left += 60; if (itimer.running) itimer.endsAt += 60000; tick(); break;
+    case "it-play":
+      if (itimer.running) { itimer.running = false; }
+      else { if (itimer.left <= 0) itimer.left = itimer.total; itimer.running = true; itimer.endsAt = Date.now() + itimer.left * 1000; }
+      b.textContent = itimer.running ? "❚❚" : "▶"; b.setAttribute("aria-label", itimer.running ? "Pause timer" : "Start timer"); tick(); break;
+    case "it-reset": itimer.running = false; itimer.left = itimer.total; { const p = document.querySelector('[data-act="it-play"]'); if (p) { p.textContent = "▶"; p.setAttribute("aria-label", "Start timer"); } } tick(); break;
+    case "delete-rec": {
+      const kind = b.dataset.kind, coll = kind === "issue" ? "issues" : "todos", rec = data[coll][id]; if (!rec) break;
+      if (!confirm(`Delete "${(kind === "issue" ? rec.title : rec.text) || "this " + (kind === "issue" ? "issue" : "to-do")}"? This can't be undone.`)) break;
+      write([coll, id], null, 0); ui.panel = null; render(); toast(kind === "issue" ? "Issue deleted" : "To-do deleted"); break;
     }
-    case "delete":
-      if (!confirm(`Delete "${m.title || "Untitled meeting"}"? This can't be undone.`)) return;
-      clearTimeout(pending[m.id]); delete pending[m.id];
-      delete meetings[m.id]; store.remove(m.id); currentId = null; renderList(); renderMain(); toast("Meeting deleted"); break;
+    case "restore": {
+      const coll = b.dataset.kind === "issue" ? "issues" : "todos";
+      write([coll, id, "archived"], null, 0); write([coll, id, "archivedAt"], null, 0); write([coll, id, b.dataset.kind === "issue" ? "solved" : "done"], false, 0);
+      render(); toast("Restored to the meeting"); break;
+    }
+    case "archive-open": ui.tab = "archive"; ui.archOpen = id; render(); { const el = $("arch-" + id); if (el) el.scrollIntoView({ block: "start" }); } break;
+    case "delete-session": if (confirm("Delete this meeting record? To-dos and issues are not affected.")) { write(["sessions", id], null, 0); render(); toast("Meeting record deleted"); } break;
+    case "add-member": {
+      const n = (ui.newMember || "").trim(); if (!n) { const el = $("s-member"); if (el) el.focus(); break; }
+      if (s.members.includes(n)) { toast(`${n} is already in this meeting`); break; }
+      write(["series", s.id, "members"], [...s.members, n], 0); ui.newMember = ""; render(); { const el = $("s-member"); if (el) el.focus(); } break;
+    }
+    case "remove-member": { const m = s.members.slice(); m.splice(Number(b.dataset.i), 1); write(["series", s.id, "members"], m, 0); render(); break; }
+    case "ag-add": { const a = s.agenda.concat([{ id: uid(), title: "", mins: 10, kind: "notes" }]); write(["series", s.id, "agenda"], a, 0); render(); { const el = $("ag-t-" + a[a.length - 1].id); if (el) el.focus(); } break; }
+    case "ag-remove": {
+      const lv = liveOf(s), i = Number(b.dataset.i);
+      if (lv && i === lv.sectionIdx) { toast("You can't remove the section the meeting is on"); break; }
+      if (!confirm(`Remove "${s.agenda[i].title || "this section"}" from the agenda?`)) break;
+      const a = s.agenda.slice(); a.splice(i, 1); write(["series", s.id, "agenda"], a, 0);
+      if (lv && i < lv.sectionIdx) write(["series", s.id, "live", "sectionIdx"], lv.sectionIdx - 1, 0);
+      render(); break;
+    }
+    case "ag-move": {
+      const i = Number(b.dataset.i), j = i + Number(b.dataset.d), a = s.agenda.slice(); if (j < 0 || j >= a.length) break;
+      [a[i], a[j]] = [a[j], a[i]]; write(["series", s.id, "agenda"], a, 0);
+      const lv = liveOf(s); if (lv && (lv.sectionIdx === i || lv.sectionIdx === j)) write(["series", s.id, "live", "sectionIdx"], lv.sectionIdx === i ? j : i, 0);
+      render(); break;
+    }
+    case "delete-series": {
+      if (!confirm(`Delete "${s.name}" with all its to-dos, issues and past meeting records? This can't be undone.`)) break;
+      ["todos", "issues", "sessions"].forEach(c => Object.values(data[c]).filter(r => r.seriesId === s.id).forEach(r => write([c, r.id], null, 0)));
+      write(["series", s.id], null, 0);
+      Object.assign(ui, { seriesId: null, tab: "meeting", panel: null }); render(); toast("Meeting deleted"); break;
+    }
   }
 });
+
+function bindValue(el) {
+  if (el.type === "checkbox") return el.checked;
+  if (el.type === "number") return Math.max(0, Number(el.value) || 0);
+  return el.value;
+}
+function setUI(path, v) { const p = path.split("."); let o = ui; for (let i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v; }
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset.ui) { setUI(el.dataset.ui, el.value); return; }
+  if (el.dataset.bind && !/^(SELECT)$/.test(el.tagName) && !/checkbox|date/.test(el.type)) write(el.dataset.bind.split("/"), bindValue(el));
+});
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.ui) { if (rendering) return; setUI(el.dataset.ui, el.value); if (el.dataset.rerender) render(); return; }
+  if (!el.dataset.bind || rendering) return;
+  const path = el.dataset.bind.split("/");
+  if (el.tagName === "SELECT" || /checkbox|date/.test(el.type)) {
+    write(path, bindValue(el), 0);
+    if (path[0] === "todos" && path[2] === "done") write(["todos", path[1], "doneAt"], el.checked ? now() : null, 0);
+    if (path[2] === "seriesId") { const ser = data.series[el.value]; toast(`Moved to ${ser ? ser.name : "another meeting"}`); }
+    render();
+  } else if (path[0] === "series" && path[2] === "name") renderTabs();
+  else if (path[2] === "agenda") render();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.dataset && e.target.dataset.enter && !e.isComposing) {
+    e.preventDefault();
+    const s = cur();
+    if (e.target.dataset.enter === "add-todo") addTodo(s);
+    else if (e.target.dataset.enter === "add-issue") addIssue(s);
+    else if (e.target.dataset.enter === "add-member") $("main").querySelector('[data-act="add-member"]').click();
+    else if (e.target.dataset.enter === "create-series") createSeries((ui.newName || "").trim());
+  }
+  if (e.key === "Escape" && ui.panel) { ui.panel = null; render(); }
+});
+document.addEventListener("toggle", e => { if (e.target.classList && e.target.classList.contains("sum")) ui.summaryOpen = e.target.open; }, true);
 
 store.init();
 </script>
